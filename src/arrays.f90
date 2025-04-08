@@ -19,7 +19,12 @@ module arrays
       strainr(:,:,:,:), flux(:,:,:,:), &
       aps(:,:),visn(:,:),e2sr(:,:), &
       temp0(:,:),source(:,:),shrheat(:,:), &
-      bcstress(:,:)
+      bcstress(:,:), &
+      ! magma migration related
+      xlab(:),tsol(:,:),tliq(:,:),tliquc(:,:),tsoluc(:,:),tsollc(:,:),tliqlc(:,:), &
+      avT(:,:),Eff_melt(:,:), zpressm(:,:),deltaTLH(:,:), &
+      Emeltcounter(:,:),zpresscounter(:,:), xfmelt(:,:), &
+      new_intrusion(:,:), av_intrusion(:,:), stored_intrusion(:,:), dv_intr(:,:)
 
   double precision, allocatable :: se2sr(:,:), sshrheat(:,:)
 
@@ -91,6 +96,25 @@ contains
     allocate(stmpn(max(nx,nz)))
     allocate(itmp(nz, nx))
 
+    ! magma migration related
+    allocate(Eff_melt(nz-1,nx-1))
+    allocate(avT(nz-1, nx-1))
+    allocate(xlab(nx))
+    allocate(zpressm(nz-1,nx-1))
+    allocate(deltaTLH(nz-1,nx-1))
+    allocate(tsol(nz-1,nx-1))
+    allocate(tliq(nz-1, nx-1))
+    allocate(tliquc(nz-1, nx-1))
+    allocate(tsoluc(nz-1, nx-1))
+    allocate(tsollc(nz-1, nx-1))
+    allocate(tliqlc(nz-1, nx-1))
+    allocate(zpresscounter(nz-1,nx-1))
+    allocate(Emeltcounter(nz-1,nx-1))
+    allocate(xfmelt(nz-1,nx-1))
+    allocate(new_intrusion(nz-1,nx-1))
+    allocate(av_intrusion(nz-1,nx-1))
+    allocate(stored_intrusion(nz-1,nx-1))
+    allocate(dv_intr(nz-1,nx-1))
   end subroutine allocate_arrays
 
 end module arrays

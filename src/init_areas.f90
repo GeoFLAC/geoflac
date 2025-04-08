@@ -8,9 +8,12 @@
 subroutine init_areas
 use arrays
 use params
-include 'precision.inc'
+implicit none
 
-!$OMP parallel do
+integer :: i,j
+double precision :: x1,y1,x2,y2,x3,y3,x4,y4,det,det1
+
+!$OMP parallel do private(i,j,x1,y1,x2,y2,x3,y3,x4,y4,det,det1) collapse(2)
 do i = 1,nx-1
     do j = 1,nz-1
 
@@ -24,7 +27,7 @@ do i = 1,nx-1
         x4 = cord (j+1,i+1,1)
         y4 = cord (j+1,i+1,2)
         
-	! (1) Element A:
+    	! (1) Element A:
         det=((x2*y3-y2*x3)-(x1*y3-y1*x3)+(x1*y2-y1*x2))
         det1 = 1.d0/det
         area(j,i,1) = det1
@@ -73,42 +76,3 @@ end
 !  | \         \  |
 !  2---3          2
 
-
-function total_area( iph )
-use arrays
-use params
-include 'precision.inc'
-
-area_t = 0
-!$OMP parallel do reduction(+:area_t)
-do i = 1,nx-1
-    do j = 1,nz-1
-
-        if( iph .ne. 0 ) then
-            if( iphase(j,i) .ne. iph ) cycle
-        endif
-        x1 = cord (j  ,i  ,1)
-        y1 = cord (j  ,i  ,2)
-        x2 = cord (j+1,i  ,1)
-        y2 = cord (j+1,i  ,2)
-        x3 = cord (j  ,i+1,1)
-        y3 = cord (j  ,i+1,2)
-        x4 = cord (j+1,i+1,1)
-        y4 = cord (j+1,i+1,2)
-
-        ! (1) Element A:
-        det=((x2*y3-y2*x3)-(x1*y3-y1*x3)+(x1*y2-y1*x2))
-        area_t = area_t + det/2
-
-        ! (2) Element B:
-        det=((x2*y4-y2*x4)-(x3*y4-y3*x4)+(x3*y2-y3*x2))
-        area_t = area_t + det/2
-
-    end do
-end do
-!$OMP end parallel do
-
-total_area = area_t
-
-return
-end

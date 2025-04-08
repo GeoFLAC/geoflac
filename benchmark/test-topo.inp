@@ -203,8 +203,8 @@ phasedat.inp   ; file with distribution of phase on the 2D grid (phasedat)
 ;vis_min (MINIMUM VISCOSITY) vis_max     ivis_shape,   efoldc
 1.0e+20,                     3.e+27,         2,         500.
 ;
-;igeotherm  g_x0,    g_y0c   g_amplitude  g_width
-0,         75.e+3,  -11.e+3,  2.e+3,       10.e+3
+;igeotherm  g_x0,    g_amplitude  g_width
+0,         75.e+3,   2.e+3,       10.e+3
 ;
 ;Magma Injection: 
 ; ny_inject (0,-no,1-left,2-center), nelem_inject, rate_inject(m/s)

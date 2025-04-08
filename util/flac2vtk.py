@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 '''Convert the binary output of flac to VTK (vts) files.
 '''
@@ -108,6 +108,9 @@ def main(path, start=1, end=-1):
         a = fl.read_fmagma(i)
         vts_dataarray(fvts, a.swapaxes(0,1), 'Magma fraction')
 
+        a = fl.read_eff_melt(i)
+        vts_dataarray(fvts, a.swapaxes(0,1), 'Eff. melt fraction')
+
         a = fl.read_diss(i)
         vts_dataarray(fvts, a.swapaxes(0,1), 'Dissipation')
 
@@ -159,7 +162,7 @@ def compute_s1(sxx, szz, sxz):
 def vts_dataarray(f, data, data_name=None, data_comps=None):
     if data.dtype in (int, np.int32, np.int_):
         dtype = 'Int32'
-    elif data.dtype in (float, np.single, np.double, np.float,
+    elif data.dtype in (float, np.single, np.double,
                         np.float32, np.float64, np.float128):
         dtype = 'Float32'
     else:

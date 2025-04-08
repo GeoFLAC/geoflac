@@ -5,6 +5,7 @@ use arrays
 use params
 include 'precision.inc'
 
+double precision :: mzone_charact
 character*200 inputfile
 
 iu = 4
@@ -110,10 +111,16 @@ call AdvanceToNextInputLine(4, line)
 read(4,*,err=1000) itherm
 line = line + 1
 call AdvanceToNextInputLine(4, line)
+read(4,*) if_hydro
+line = line + 1
+call AdvanceToNextInputLine(4, line)
 read(4,*,err=1000) istress_therm
 line = line + 1
 call AdvanceToNextInputLine(4, line)             ! thermal stresses
 read (4,*,err=1000) ishearh                           ! shear heating
+line = line + 1
+call AdvanceToNextInputLine(4, line)
+read(4,*) isolidus
 line = line + 1
 call AdvanceToNextInputLine(4, line)
 read (4,*,err=1000) t_top
@@ -240,10 +247,21 @@ call AdvanceToNextInputLine(4, line)
 read(4,*,err=1000) v_min, v_max, ivis_shape,efoldc
 line = line + 1
 call AdvanceToNextInputLine(4, line)
+read(4,*,err=1000) igeotherm, g_x0, g_amplitude, g_width 
+line = line + 1
+call AdvanceToNextInputLine(4, line)
 read(4,*,err=1000) itype_melting, nelem_serp, prod_magma, rho_magma
 line = line + 1
 call AdvanceToNextInputLine(4, line)
-read(4,*,err=1000) angle_mzone, fmagma_max, ratio_mantle_mzone
+read(4,*,err=1000) mzone_style, mzone_charact
+line = line + 1
+call AdvanceToNextInputLine(4, line)
+read(4,*,err=1000) fmagma_max, ratio_crust_mzone, ratio_mantle_mzone
+if (mzone_style.eq.1) then
+    angle_mzone = mzone_charact
+elseif (mzone_style.eq.2) then
+    width_mzone = mzone_charact
+endif
 line = line + 1
 call AdvanceToNextInputLine(4, line)
 read(4,*,err=1000) latent_heat_magma, lambda_freeze, lambda_freeze_tdep
@@ -341,6 +359,9 @@ line = line + 1
 
 close (iu)
 
+! ADDITIONAL PARTICULAR INPUT
+call ReadMoreParams()
+
 return
 1000  print *, 'Error reading file "', trim(inputfile), '" at line', line
 stop 11
@@ -364,6 +385,16 @@ integer iu, line
 
 print *, 'AdvanceToNextInputLine: EOF reached!'
 stop
+
+return
+end
+
+subroutine ReadMoreParams()
+use params
+
+!call ReadIntrusions()  ! - see user_ab.f90
+
+if( if_hydro .eq. 1 ) call ReadHydro()       ! - see user_luc.f90
 
 return
 end

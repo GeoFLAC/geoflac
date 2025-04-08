@@ -8,6 +8,8 @@ MODULE marker_data
   double precision, allocatable :: mark_a1(:), mark_a2(:) ! baricentric coordinates
   double precision, allocatable :: mark_x(:), mark_y(:)   ! Euler coordinates
   double precision, allocatable :: mark_age(:)            ! creation time
+  double precision, allocatable :: mark_zpressn(:)        ! normal pressure
+  double precision, allocatable :: mark_Emeltm(:)         ! melt
   integer, allocatable :: mark_dead(:)
   integer, allocatable :: mark_ntriag(:)      ! number of FE-triangle
   integer, allocatable :: mark_phase(:)
@@ -22,6 +24,7 @@ MODULE marker_data
     implicit none
 
     integer, intent(in) :: nz, nx
+
     max_markers = nz * nx * max_markers_per_elem
     !$ACC update device(max_markers) async(1)
 
@@ -31,14 +34,18 @@ MODULE marker_data
              mark_dead(max_markers), &
              mark_ntriag(max_markers), &
              mark_phase(max_markers), &
-             mark_ID(max_markers))
+             mark_ID(max_markers), &
+             mark_zpressn(max_markers), &
+             mark_Emeltm(max_markers))
 
     allocate(mark_id_elem(max_markers_per_elem, nz-1, nx-1))
     allocate(nmark_elem(nz-1, nx-1))
 
+    return
   end subroutine
 
-  subroutine add_marker(x, y, iph, age, j, i, inc)
+  
+  subroutine add_marker(x, y, iph, xxpres, xxmelt, age, j, i, inc)
     !$ACC routine seq
     !$ACC routine(check_inside) seq
     ! Add a marker at physical coordinate (x, y), with phase iph and age, to
@@ -50,11 +57,11 @@ MODULE marker_data
     use arrays
     use params
     implicit none
+
     integer :: iph, j, i, inc
-    double precision :: x, y, age
+    double precision :: x, y, age, xxpres, xxmelt
     integer :: ntr, kk, nm
     double precision :: bar1, bar2
-    !character*200 msg
 
     call check_inside(x , y, bar1, bar2, ntr, i, j, inc)
     if(inc.eq.0) return
@@ -76,7 +83,16 @@ MODULE marker_data
     if(nm > max_markers_per_elem .or. kk > max_markers) then
         !write(msg*) 'Too many markers at element:', i, j, nm
         !call SysMsg(msg)
-        !call SysMsg('Marker skipped, not added!')
+        call SysMsg('Marker skipped, not added!')
+          
+        !$OMP atomic update
+        !$ACC atomic update
+        nmarkers = nmarkers - 1
+
+        !$OMP atomic update
+        !$ACC atomic update
+        nmark_elem(j,i) = nmark_elem(j,i) - 1
+    
         inc = -1
         return
     endif
@@ -93,7 +109,10 @@ MODULE marker_data
     mark_age(kk) = age
     mark_ntriag(kk) = ntr
     mark_phase(kk) = iph
+    mark_zpressn(kk) = xxpres
+    mark_Emeltm(kk) = xxmelt
 
+    return
   end subroutine add_marker
 
 
@@ -135,7 +154,7 @@ MODULE marker_data
     use arrays
 
     integer, intent(in) :: j, i
-    integer :: n, kk, ncounters(maxph), iph, kph, nm
+    integer :: n, kk, ncounters(maxph), iph, nm
 
     if (nmark_elem(j,i) == 0) stop 'No markers in element'
 
@@ -151,7 +170,6 @@ MODULE marker_data
     enddo
 
     ! the phase of this element is the most abundant marker phase
-    !kph = maxloc(ncounters)
     iph = 1
     nm = 0
     do kk = 1, nphase
@@ -161,6 +179,8 @@ MODULE marker_data
        end if
     end do
     iphase(j,i) = iph
+
+    return
   end subroutine count_phase_ratio
 
 END MODULE marker_data

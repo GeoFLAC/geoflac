@@ -250,6 +250,16 @@ class Flac(object):
         return fmagma
 
 
+    def read_eff_melt(self, frame):
+        columns = 1
+        f = open('eff_melt.0')
+        offset = (frame-1) * columns * self.nelements * sizeoffloat
+        f.seek(offset)
+        eff_melt = self._read_data(f, columns, count=self.nelements)
+        self._reshape_elemental_fields(eff_melt)
+        return eff_melt
+
+
     def read_diss(self, frame):
         columns = 1
         f = open('diss.0')
@@ -642,6 +652,14 @@ class FlacFromVTK(object):
         fmagma = np.frombuffer(a, dtype=np.float32)
         fmagma.shape = (self.nx-1, self.nz-1)
         return fmagma.transpose()
+
+
+    def read_eff_melt(self, frame):
+        data = self._get_vtk_data(frame)
+        a = self._locate_line(data, "Eff melt fraction")
+        eff_melt = np.frombuffer(a, dtype=np.float32)
+        eff_melt.shape = (self.nx-1, self.nz-1)
+        return eff_melt.transpose()
 
 
     def read_diss(self, frame):

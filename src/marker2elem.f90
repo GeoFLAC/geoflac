@@ -7,9 +7,9 @@ subroutine marker2elem
   use phases
   implicit none
 
-  integer :: kph(1), i, j, k, kinc, inc, iseed, icount
+  integer :: i, j, kinc, inc, iseed, icount
   double precision :: x1, x2, y1, y2, xx, yy, r1, r2
-
+  
   !character*200 msg
 
   ! Interpolate marker properties into elements
@@ -47,13 +47,18 @@ subroutine marker2elem
               xx = x1*(1-r2) + x2*r2
               yy = y1*(1-r2) + y2*r2
 
-              call add_marker(xx, yy, iphase(j,i), 0.d0, j, i, inc)
+              call add_marker(xx, yy, iphase(j,i), zpressm(j,i), Eff_melt(j,i), 0.d0, j, i, inc)
               icount = icount + 1
               if(icount > 100) stop 133
               if(inc.le.0) cycle
 
               kinc = kinc + 1
+              zpresscounter(j,i) = zpresscounter(j,i) + zpressm(j,i)
+              Emeltcounter(j,i) = Emeltcounter(j,i) + Eff_melt(j,i)
           enddo
+
+          Eff_melt(j,i) = Emeltcounter(j,i)/float(kinc)
+          zpressm(j,i) = zpresscounter(j,i)/float(kinc)
 
           call count_phase_ratio(j,i)
 
@@ -61,21 +66,41 @@ subroutine marker2elem
   enddo
   !$OMP end parallel do
 
-  ! Find the Moho
+! Find the Moho
+if (itype_melting.eq.2) then
+    !$OMP parallel do private(i,j)
+    !$ACC loop auto
+    do i = 1, nx-1
+        jmoho(i) = nz-1
+        do j = 1, nz-1
+            if (sum(phase_ratio(mantle_phases,j,i)) > 0.5d0) then
+                if (phase_ratio(kocean0,j,i) > 0.1.or.fmelt(j,i)>0.) then
+                    jmoho(i) = j - 1
+                else
+                    jmoho(i) = j
+                endif
+                exit
+            endif
+        enddo
+        if (jmoho(i).le.8) jmoho(i) = 8
+    enddo
+    !$OMP end parallel do
+else
+    !$OMP parallel do private(i,j)
+    !$ACC loop auto
+    do i = 1, nx-1
+        jmoho(i) = nz-1
+        do j = 1, nz-1
+            if (sum(phase_ratio(mantle_phases,j,i)) > 0.5d0) then
+                jmoho(i) = j
+                exit
+            endif
+        enddo
+    enddo
+    !$OMP end parallel do
+endif
 
-  !$OMP parallel do
-  !$ACC loop auto
-  do i = 1, nx-1
-      jmoho(i) = nz-1
-      do j = 1, nz-1
-          if (sum(phase_ratio(mantle_phases,j,i)) > 0.5d0) then
-              jmoho(i) = j
-              exit
-          endif
-      enddo
-      !print *, i, jmoho(i)
-  enddo
-  !$OMP end parallel do
+if (nloop .ne. 0 .and. itype_melting.eq.2) call check_chamber
 
-  return
+return
 end subroutine marker2elem

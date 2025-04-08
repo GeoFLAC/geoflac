@@ -301,6 +301,11 @@ if( io_src.eq.1 ) then
     open (1,file='fmagma.0',access='direct',recl=nwords*kindr)
     write (1,rec=nrec) De
     close (1)
+
+    De(1:nz-1,1:nx-1) = real(Eff_melt(1:nz-1,1:nx-1))
+    open (1,file='eff_melt.0',access='direct',recl=nwords*kindr)
+    write (1,rec=nrec) De
+    close (1)
 endif
 
 

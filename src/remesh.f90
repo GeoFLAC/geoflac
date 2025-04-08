@@ -98,15 +98,31 @@ do k = 1, 3
     call rem_interpolate( nzt, nxt, dummye, strain(:,:,k) )
 end do
 
-
 ! plastic strain
 call rem_interpolate( nzt, nxt, dummye, aps )
 
 ! Magma fraction
-if (itype_melting == 1) then
+if (itype_melting .ge. 1) then
     call rem_interpolate( nzt, nxt, dummye, fmagma )
+    !$OMP parallel do private(i,j)
+    do i = 1, nxt
+        do j = 1, nzt
+            if( fmagma(j,i) .gt. fmagma_max ) then
+                fmagma(j,i) = fmagma_max
+            endif
+        end do
+    end do
+    !$OMP end parallel do
 endif
 
+! Interpolate accumulated melt for melt_prod
+call rem_interpolate( nzt, nxt, dummye, Eff_melt )
+
+! Interpolate stored melt
+call rem_interpolate( nzt, nxt, dummye, stored_intrusion )
+
+! Interpolate accumulated extrusion and intrusion volume changes
+call rem_interpolate( nzt, nxt, dummye, dv_intr )
 
 !$OMP parallel do
 !$ACC parallel loop collapse(2) async(1)
@@ -444,7 +460,7 @@ double precision :: f1, f2, f3
 dummy = arr
 !$ACC end kernels
 
-!$OMP parallel do private(numq,io,jo,f1,f2,f3)
+!$OMP parallel do private(i,j,numq,io,jo,f1,f2,f3)
 !$ACC parallel loop collapse(2) async(1)
 do i = 1, nxt
     do j = 1, nzt
@@ -473,7 +489,7 @@ do i = 1, nxt
         arr(j,i) = barcord(j,i,1)*f1 + barcord(j,i,2)*f2 + barcord(j,i,3)*f3
     end do
 end do
-!$end parallel do
+!$OMP end parallel do
 
 return
 

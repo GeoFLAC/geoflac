@@ -10,36 +10,27 @@
 ;==================================================================
 ;             M e s h    P a r a m e t e r s 
 ;==================================================================
-80,30            number of _elements_ in X and Z directions: (nx-1),(nz-1)
+185,64            number of _elements_ in X and Z directions: (nx-1),(nz-1)
 0.e+3,0.           x0,z0 begin.coord
-320.e+3,-100.e+3    rxbo,rzbo (size of the region, rxbo > 0, rzbo < 0)
+960.e+3,-300.e+3    rxbo,rzbo (size of the region, rxbo > 0, rzbo < 0)
 ;
 0, points.xy    ircoord, coordfile: read init. coordinates from the file
 ;
 ; X direction
 3     Number zones X-direction (0 - regular grid)
 ; nelem per zone    size(non-dimen, must sum to 1.0)
- 24  0.375
- 50  0.5
-  6  0.125
+ 45  0.375
+120  0.5
+ 20  0.125
 ;
 ; Z direction
-3                Number zones Z-direction (0 - regular grid)
+4                Number zones Z-direction (0 - regular grid)
 ; nelem per zone    size(non-dimen, must sum to 1.0)
- 4  0.1
-12  0.4
-14  0.5
+ 5  0.025
+ 9  0.075
+30  0.4
+20  0.5
 ; 
-;;  iint_marker, iint_tracer
-1, 0            marker(1-yes,0-no),tracer(1-yes,0-no)
-1     number of rectangular zones with 9 markers (other areas with 1 marker only).
-; upper left and lower right corners of the elements
-1 1 50 10          i1,j1,i2,j2 
-;
-1, 1.   number of rectangular zones with tracers (stores x,z,T,P,etc), frequency of storage in 1000yrs.
-; upper left and lower right corners of the elements
-1 1 50 15           i1,j1,i2,j2 
-;
 ;===================================================================
 ;        C o n d i t i o n s:  M e c h a n i c a l
 ;===================================================================
@@ -49,7 +40,7 @@
 ; nofbc: Number of boundary conditions
 2
 ;----------------------------------------------------------------
-;nofside       1-left,2-bottom,3-right,4-top
+;nofside       1-left,2-bottom,3-right,4-top,5-mid-plate
 ;nbc1,nbc2     range of application of boundary condition
 ;nbc           type of boundary condition
 ;  there are the following forms of boundary conditions:
@@ -66,8 +57,8 @@
 ;where x is undimensional. i.e. x = (x - x(na1)) / (x(na2) - x(na1))
 ;-------------------------------------------------------------------------------
 ;nofside  nbc1 nbc2  nbc   a       b    c     d     e     f      g     h     i 
-1         1    31    10   1.56e-9  0.   0.    0.    0.    0.     0.    0.    0.
-3         1    31    10   0.e-10   0.   0.    0.    0.    0.     0.    0.    0.
+1         1    65    10   1.56e-9  0.   0.    0.    0.    0.     0.    0.    0.
+3         1    65    10   0.e-10   0.   0.    0.    0.    0.     0.    0.    0.
 ;
 ; Hydrostatic pressure  applied at the bottom (on the depth of rzbo and TOP!!)
 ; {y,n(1,0),auto(2)}, Pressure at compens.depth, substratum phase, addit. dens. diff, damp_vis
@@ -80,7 +71,7 @@
 ;=============================================================
 0       -iprestress: allow topo build up by isostasy for 600 kyrs
 1        - itherm  (1-mech+therm, 2-no mech)
-1        - istress_therm: Add THERMAL STRESSES (0,1,2-just 1 step)
+0        - istress_therm: Add THERMAL STRESSES (0,1,2-just 1 step)
 1        - ishearh: Add SHEAR heating
 10.       - t_top (Surface temperature in Celsius). Boundary AND initial condition.
 1330.     - t_bot (Bottom temperature in Celsius). ONLY initial condition.
@@ -91,24 +82,30 @@
 ; Bottom Boundary conditions flag and value (1- temperature, 2- heat flux in mW/m2 ) 
 1 1330. 
 ;
-; Initial additional perturbation (quadralateral)
-0.,40,50,3,8          - temp_per,ix1,ix2,iy1,iy2 (box of thermal perturbation)
-;
 ; Predefined distributions
 0              irtemp (0,1) (read temperature file or not)
 proftemp.dat   temperature profile dat.file
 ;
-1.e+0          - time_scale (not used)
-; Temperature structure for ridges (3 linear segments) above linear
-; Max Temperature or bottom Temperature (iynts:0/no,1/yes,2/use initial geotherm from age), tbos
-2 425.
-; From the left in grid units A(iax1,iay1), B(ibx1,iby1), C(icx1,icy1),
-240 55 300 27 301 27 361 55
-; If (iynts = 2) Initially Variable thermal age crust and mantle accross the box 
-2              - nzone_age (number of zones of different age max 20)
-;Thermal age (Myr.), layer1 depth (km), layer2 depth, layer3 depth (also Moho depth), layer4 depth, layer1 phase, layer2 phase, layer3 phase, layer4 phase, layer5 phase, x nodes 1 and 2
- 60., 2.5, 7.5, 7.5, 7.5, 11,  3,  4,  4,  4,  1, 38
- 60., 7.5, 7.5, 7.5, 7.5,  3,  3,  4,  4,  4, 39, 81
+; Initial varying thermal age crust and mantle accross the box (see doc/input_description.md for the meaning of parameters)
+5              - nzone_age (number of zones of different age max 20)
+;ictherm, age (Myr.), tp1, tp2, nph_layer (N), x nodes 1 and 2
+;    nph_layer (N), layer depth #1 (km), #2, ..., #N-1
+;    layer phase #1, #2, ..., #N
+ 1,100.,  0,  0,  1, 58
+    4,  1.5, 7.5, 17.5
+   11,    3,  16,   4
+12,100.,120, 15, 59, 75
+    3, 10.0,  15
+    2,   14,   4
+12,100.,120, 15, 76, -1
+    3, 10.0,  15
+    2,   14,   4
+12,200.,200, 35, -1,170
+    3, 20.0,  35
+    2,   14,   4
+12,200.,200, 35,171,186
+    3, 20.0,  35
+    2,   14,   4
 ;
 ;===================================================================
 ;                     R h e o l o g y
@@ -119,7 +116,7 @@ proftemp.dat   temperature profile dat.file
 ;11- visco-elasto-plastic (Mohr-Coulomb,Fixed Maxwell,Newtonian) with softening
 ;12- visco-elasto-plastic (Mohr-Coulomb,Maxwell,Non-Newtonian) with softening
 ;
-16  Number of Different Rheologies (<20)
+17  Number of Different Rheologies (<20)
 ;
 ;irheol,_,den, alfa,  beta,    n,       A,       E,    Lame:rl, Lame:rm,pls1,pls2,fric1,fric2, coh1, coh2,dilat1,dilat2,cond,    cp,     Ts,     Tl,     Tk, fk
 ;(1) basalt, no dehydration
@@ -130,7 +127,7 @@ proftemp.dat   temperature profile dat.file
 12,1., 2880., 3.0e-5, 0.0e-12, 3.05, 1.25e-1, 3.76e+5, 3.0e+10, 3.0e+10, 0.0, 0.1, 30.0, 15.0, 4.e+7, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
 ;(4) olivine, same as (8)
 12,1., 3300., 3.0e-5, 0.0e-12, 3.00, 7.00e+4, 5.20e+5, 3.0e+10, 3.0e+10, 0.0, 0.1, 30.0, 15.0, 4.e+7, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
-;(5) metasediment (gneiss), transformed from (10) and (11)
+;(5) shist, transformed from (17)
 11,1., 2900., 3.0e-5, 0.0e-12, 3.00, 7.00e+4, 3.76e+5, 3.0e+10, 3.0e+10, 0.0, 0.1, 30.0, 15.0, 4.e+7, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
 ;(6) continental crust, same as (2)
 12,1., 2900., 3.0e-5, 0.0e-11, 3.05, 1.25e-1, 2.76e+5, 3.0e+10, 3.0e+10, 0.0, 0.1, 30.0, 15.0, 4.e+7, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
@@ -140,10 +137,10 @@ proftemp.dat   temperature profile dat.file
 12,1., 3300., 3.0e-5, 0.0e-12, 3.00, 7.00e+4, 5.20e+5, 3.0e+10, 3.0e+10, 0.0, 0.1, 30.0, 15.0, 4.e+7, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
 ;(9) weak olivine (serpentinite), transformed from (4) and (8), if overlying subducted oceaninc crust phase (3), (7) or (11); transform back to (4) if deeper than 65 km
 12,1., 3200., 3.0e-5, 0.0e-12, 3.00, 7.00e+4, 1.20e+5, 3.0e+10, 3.0e+10, 0.0, 0.1,  3.0,  3.0, 4.e+6, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
-;(10) sediment 1, generated by erosion
-12,1., 2800., 3.0e-5, 0.0e-11, 3.00, 5.00e2 , 2.00e+5, 3.0e+10, 3.0e+10, 0.0, 0.1,  3.0,  3.0, 4.e+6, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
-;(11) sediment 2
-12,1., 2800., 3.0e-5, 0.0e-11, 3.00, 5.00e2 , 2.00e+5, 3.0e+10, 3.0e+10, 0.0, 0.1,  3.0,  3.0, 4.e+6, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
+;(10) sedimentary rock, transformed from (11)
+12,1., 2600., 3.0e-5, 0.0e-11, 3.00, 5.00e2 , 2.00e+5, 3.0e+10, 3.0e+10, 0.0, 0.1,  15.0,  3.0, 4.e+7, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
+;(11) sediment, generated by erosion
+12,1., 2400., 3.0e-5, 0.0e-11, 3.00, 5.00e2 , 2.00e+5, 3.0e+10, 3.0e+10, 0.0, 0.1,  3.0,  3.0, 4.e+6, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
 ;(12) weak crust, transformed from (2) and (6), if overlying oceanic crust (3), (7), (11), (14)
 12,1., 2800., 3.0e-5, 0.0e-11, 3.05, 1.25e-1, 1.76e+5, 3.0e+10, 3.0e+10, 0.0, 0.1,  3.0,  3.0, 4.e+6, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
 ;(13) eclogite, transformed from (3) and (7), denser and more viscous
@@ -152,25 +149,19 @@ proftemp.dat   temperature profile dat.file
 12,1., 2900., 3.0e-5, 0.0e-12, 3.05, 1.25e-1, 5.76e+5, 3.0e+10, 3.0e+10, 0.0, 0.1, 30.0, 15.0, 4.e+7, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
 ;(15) weak middle crust, transformed from (2) and (6) if stressed and heated (disabled)
 12,1., 2800., 3.0e-5, 0.0e-11, 3.00, 5.00e2 , 2.00e+5, 3.0e+10, 3.0e+10, 0.0, 0.1,  3.0,  3.0, 4.e+6, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
-;(16) olivine, hydated
-12,1., 3200., 3.0e-5, 0.0e-12, 3.00, 7.00e+4, 5.20e+5, 3.0e+10, 3.0e+10, 0.0, 0.1, 30.0, 15.0, 4.e+7, 4.e+6,   0,     0,  3.3, 1000.,   700., 16000., 16000., 1.
+;(16) olivine, hydated (chlorite-containing)
+12,1., 3200., 3.0e-5, 0.0e-12, 3.00, 7.00e+4, 5.20e+5, 3.0e+10, 3.0e+10, 0.0, 0.1, 30.0, 15.0, 4.e+7, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
+;(17) metamorphic sedimentary rock, transformed from (10)
+12,1., 2800., 3.0e-5, 0.0e-11, 3.00, 5.00e2 , 2.00e+5, 3.0e+10, 3.0e+10, 0.0, 0.1, 30.0, 15.0, 4.e+7, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
 ;
 ; INITIAL PHASE DISTRIBUTION
 0              ; irphase (0,1) read a distribution of phases
 phasedat.inp   ; file with distribution of phase on the 2D grid (phasedat)
-; Main phase
-4    -mphase
-; Number of horizontal layers with other phases
-2   - nphasl
-; top element   bottom    Phase
-     1             5        3 
-     6            30        4
 ;
 ; Initial heterogeneities
 ;
 ; Weak zone geometries:
 ; 0- rectangular,
-; 1,2- Gauss shape
 ; 3- diagonal line
 ; 4- diagonal line plus init.plastic strain
 ;
@@ -182,13 +173,19 @@ phasedat.inp   ; file with distribution of phase on the 2D grid (phasedat)
 ; 21- trapzoidal, surface nodes linearly increase ix1-ix2, flat ix2-iy1,
 ;     decrease iy1-iy2, max. elevated by amp
 ;
-0  - inhom(number of inhomogenities)
+; Fixed low viscosity zone
+; 100- rectangular, viscosity=vis_min, for mid-ocean-ridge at sides
+;
+8  - inhom(number of inhomogenities)
 ; ix1   ix2   iy1   iy2   phase   geometry    init.pl.strain (amp)
-;   50    66    2    18     3       4          1.     ; subducted oceanic crust
-;   51    67    2    18     3       4          1.
-;   52    68    2    18	  -1       4          1.     ; weak zone
-;   53    69    2    18	  -1       4          1.
-;   45    57    2    19     0       13         -500   ; cold slab
+   51    63    6    18    16       4          1.
+   52    64    6    18    16       4          1.
+   53    65    6    18    16       4          1.
+   54    66    6    18     3       4          1.     ; subducted oceanic crust
+   55    67    6    18     3       4          1.
+   52    68    2    18	  -1       4          1.     ; weak zone
+   53    69    2    18	  -1       4          1.
+   45    57    2    19     0       13         -500   ; cold slab
 ;
 ; Tension cut off
 1.e+9
@@ -201,19 +198,21 @@ phasedat.inp   ; file with distribution of phase on the 2D grid (phasedat)
 ;vis_min (MINIMUM VISCOSITY) vis_max     ivis_shape,   efoldc
 1.0e+20,                     3.e+27,         2,         500.
 ;
-;igeotherm  g_x0,    g_y0c   g_amplitude  g_width
-0,         75.e+3,  -11.e+3,  2.e+3,       10.e+3
-;
-;Magma Injection: 
-; ny_inject (0,-no,1-left,2-center), nelem_inject, rate_inject(m/s)
-; Tan2: reuse nelem_inject for thickness of serpentinite layer above subducted oceanic crust
-0,         2,     0.1
+;Magma: 
+; itype_melting, nelem_serp, prod_magma, rho_magma
+1,               2,          2e-15,      2700
+; angle_mzone, fmagma_max, ratio_mantle_mzone
+30,            0.1,        0.1
+; latent_heat_magma, lambda_freeze, lambda_freeze_tdep
+4.2e5,               1e-13,         2e-3
+; weaken_ratio_plastic, weaken_ratio_viscous
+1.0,                    1.0
 ;
 ;=================================================================
 ;                       R e m e s h i n g
 ;=================================================================
 ;ny_rem (0,1), mode_rem(1, 3 or 11),  ntest_rem,  angle_rem(degrees,when magmainj le 10)
-1            3               1         10.
+1            3               1         5.
 ;
 ; dx_rem (if mode_rem=11 defines critical shortening for remeshing in dx-units)
 1.3
@@ -234,10 +233,7 @@ phasedat.inp   ; file with distribution of phase on the 2D grid (phasedat)
 1       Freq. re-evaluation Non-Newtonian VISC (rheol.eq.12)
 1       Freq. averaging strain rate and dissipation
 ;
-; Acceleration Parameters (Cundall, 1982)
-1.00,5.e-2,1.e-1    amul,ratl,ratu
 0.45,0.5        frac_elastic,frac_maxwell
-0                   n_boff_cutoff
 1,2                 movegrid (0-no,1-yes,2-move under strain_rate), ndim (num.dim.)
 0.8,1,1             damping, Mixing Procedures:mix1, mix2 (0,1),(strain,stress)
 ;
@@ -247,7 +243,7 @@ phasedat.inp   ; file with distribution of phase on the 2D grid (phasedat)
 ; Time parameters below are in thousands years
 ;
 ; Max time of calculations (in Kyr)
-.04  ;  24 Myrs
+.03  ;  24 Myrs
 ;
 ; Time interval for screen output of calc. progress (in Kyr)
 .002
@@ -263,7 +259,7 @@ phasedat.inp   ; file with distribution of phase on the 2D grid (phasedat)
 0
 ;
 ; Time interval for process saving
-1000 - nsave (frequency of saving)
+4 - nsave (frequency of saving)
 ;
 ; saving the last step only (1) or each nsave step (0)
 1

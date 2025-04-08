@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 '''Convert the binary marker output of flac to VTK (vtp) files.
 '''

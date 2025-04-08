@@ -46,12 +46,21 @@ omp = 1
 acc = 0
 coverage = 0
 gprof = 0
+nprof = 0
+cuda_path = #/path/to/hpc_sdk/Linux_x86_64/25.1/cuda
 
 
 ########################################################################
 ## Select compiler and linker flags
 ## (Usually you won't need to modify anything below)
 ########################################################################
+
+ifeq ($(nprof), 1)
+	F90 = nvfortran
+	CFLAGS += -cpp -DUSE_NVTX
+else
+	CFLAGS += -cpp
+endif
 
 ## for GNU gfortran >= 5
 ifeq ($(F90), gfortran)
@@ -131,6 +140,20 @@ ifeq ($(F90), f90)
 	endif
 endif
 
+ifeq ($(F90), nvfortran)
+	ifeq ($(debug), 0)
+		CFLAGS += -O
+		ifeq ($(omp), 1)
+			CFLAGS += -fopenmp
+			LDFLAGS += -fopenmp
+		endif
+	else
+		CFLAGS += -O0 -traceback
+	endif
+
+	CFLAGS += -L$(cuda_path)/lib64 -lnvToolsExt
+	LDFLAGS += -L$(cuda_path)/lib64 -Wl,-rpath,$(cuda_path)/lib64 -lnvToolsExt
+endif
 
 ########################################################################
 ## list of source files
@@ -143,6 +166,10 @@ MODULE_SRCS = \
 	arrays.f90 \
 	phases.f90 \
 	marker_data.f90
+
+ifeq ($(nprof), 1)
+	MODULE_SRCS += nvtx_mod.f90
+endif
 
 SRCS =	\
 	bar2euler.f90 \
@@ -181,7 +208,8 @@ SRCS =	\
 	rmasses.f90 \
 	rsflac.f90 \
 	saveflac.f90 \
-	setflac.f90
+	setflac.f90 \
+	user_luc.f90
 
 SRCS2 = check_nan.f90
 

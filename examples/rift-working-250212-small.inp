@@ -1,0 +1,258 @@
+; -*- LISP -*-
+;
+; This is an input file for flac, not a LISP source code.
+; But it is displayed in LISP mode to distinguish the comments.
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Simple ocean-ocean subduction
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;==================================================================
+;             M e s h    P a r a m e t e r s 
+;==================================================================
+150 75            number of _elements_ in X and Z directions: (nx-1),(nz-1)
+0.e+3,0.e+3           x0,z0 begin.coord
+250.e+3,-125.e+3    rxbo,rzbo (size of the region, rxbo > 0, rzbo < 0)
+;
+0, points.xy    ircoord, coordfile: read init. coordinates from the file
+;
+; X direction
+0     Number zones X-direction (0 - regular grid)
+; nelem per zone    size(non-dimen, must sum to 1.0)
+;50  0.33
+;200  0.34
+;50  0.33
+;
+; Z direction
+0                Number zones Z-direction (0 - regular grid)
+; nelem per zone    size(non-dimen, must sum to 1.0)
+;100  0.34
+;50   0.66
+; 
+;
+;===================================================================
+;        C o n d i t i o n s:  M e c h a n i c a l
+;===================================================================
+; nystressbc, nydrsides
+; Stress boundary conditions (0:no,1:yes), lithostatic stress bc on the sides (0/1)
+1  1 
+; nofbc: Number of boundary conditions
+2
+;----------------------------------------------------------------
+;nofside       1-left,2-bottom,3-right,4-top,5-mid-plate
+;nbc1,nbc2     range of application of boundary condition
+;nbc           type of boundary condition
+;  there are the following forms of boundary conditions:
+;  0  - no conditions
+;  10 - velx            01 - velz
+;  20 - normal stress   02 - shear stress (x,z) plane
+;  30 - vely                (strike slip version)
+;----------------------------------------------------------------
+;  Function of boundary conditions:
+;------------------------------------------------------------------
+;f = a + bx + cx**2 + (d cos (2pi ex) + f sin (2pi gx))*exp((x-i)*h)^2
+;Dependence on time:   f(time) = f*(1 + df1*nstep) + df2*nstep
+;------------------------------------------------------------------
+;where x is undimensional. i.e. x = (x - x(na1)) / (x(na2) - x(na1))
+;-------------------------------------------------------------------------------
+;nofside  nbc1 nbc2  nbc   a       b    c     d     e     f      g     h     i 
+1         1   76    10   -1.6e-10   0. 0.    0.    0.    0.     0.    0.    0.
+3         1    76    10    1.6e-10   0. 0.    0.    0.    0.     0.    0.    0.
+;
+; Hydrostatic pressure  applied at the bottom (on the depth of rzbo and TOP!!)
+; {y,n(1,0),auto(2)}, Pressure at compens.depth, substratum phase, addit. dens. diff, damp_vis
+2                   0.                       8            0.            0.e+7
+;
+; Gravity
+9.81
+;=============================================================
+;            C o n d i t i o n s : T h e r m a l
+;=============================================================
+0       -iprestress (fix boundaries) topo build up  stress up buyoancy are there for 200000. yrs
+1        - itherm  (1-mech+therm, 2-no mech)
+1        - if_hydro  (1-hydrothermal circulatio, 0-no hydro )
+0        - istress_therm: Add THERMAL STRESSES (0,1,2-just 1 step)
+0        - ishearh: Add SHEAR heating
+1        - isolidus: chose a solidus (1-Katz (default),2-Hirschmann, 3-Herzberg, 4-McKenzie & Bickle).
+10.       - t_top (Surface temperature in Celsius). Boundary AND initial condition.
+1330.     - t_bot (Bottom temperature in Celsius). ONLY initial condition.
+;
+; Radiogenic heating
+1.e-9, 10.      - hs (W/kg ~ 1.e-9),  hr (radio_fold) (km)
+;
+; Bottom Boundary conditions flag and value (1- temperature, 2- heat flux in mW/m2, 3 - asth. pot. temp) 
+3 1450. 
+;
+; Predefined distributions
+0              irtemp (0,1) (read temperature file or not)
+proftemp.dat   temperature profile dat.file
+;
+; If (iynts = 2) Initially Variable thermal age continental and oceanic lithosphere accross the box (for convenience cont crust iph=1,
+; oceanic crust iph = 2, oceanic mantle (dry) iph = 3, continental mantle (wet weak) iph = 4)
+1              - nzone_age (number of zones of different age max 20)
+;ictherm, age (Myr.), tp1, tp2, nph_layer (N), x nodes 1 and 2
+;    nph_layer (N), layer depth #1 (km), #2, ..., #N-1
+;    layer phase #1, #2, ..., #N
+12, 100., 120, 15, 1, 151
+     3,   30, 86
+     2,    4,  8
+;
+;===================================================================
+;                     R h e o l o g y
+;===================================================================
+; 1- elastic,
+; 3- visco-elastic (Maxwell,Non-Newtonian) with softening
+; 6- elasto-plastic (Mohr-Coulomb) with softening
+;11- visco-elasto-plastic (Mohr-Coulomb,Fixed Maxwell,Newtonian) with softening
+;12- visco-elasto-plastic (Mohr-Coulomb,Maxwell,Non-Newtonian) with softening
+;
+20  Number of Different Rheologies (<20)
+;
+;irheol,_,den, alfa,  beta,    n,       A,       E,    Lame:rl, Lame:rm,pls1,pls2,fric1,fric2, coh1, coh2,dilat1,dilat2,cond,    cp,     Ts,     Tl,     Tk, fk
+;(1) basalt melt, 
+12,1., 2900., 3.0e-5, 0.0e-11, 3.50, 1.10e+5, 4.30e+5, 4.3e+10, 4.3e+10, 0.0, 0.1, 30.0, 10.0, 4.e+7, 4.e+6,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;(2) continental crust, same as (6)
+12,1., 2750., 3.0e-5, 0.0e-11, 3.05, 1.25e-1, 2.76e+5, 4.0e+10, 3.5e+10, 0.0, 0.1, 30.0, 20.0, 4.e+7, 4.e+6,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;(3) basalt (intruded in mantle), same as (7)
+12,1., 2900., 3.0e-5, 0.0e-11, 3.05, 1.25e-1, 2.76e+5, 4.3e+10, 4.3e+10, 0.0, 0.1, 30.0, 30.0, 4.e+7, 4.e+6,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;(4) olivine, same as (8)
+12,1., 3300., 3.0e-5, 0.0e-11, 3.50, 1.10e+5, 5.30e+5, 6.7e+10, 6.7e+10, 0.0, 5., 30.0, 30.0, 4.e+7, 4.e+6,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;(5) shist, transformed from (17)
+11,1., 2900., 3.0e-5, 0.0e-12, 3.00, 7.00e+4, 3.76e+5, 3.0e+10, 3.0e+10, 0.0, 0.1, 30.0, 15.0, 4.e+7, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
+;(6) continental crust, same as (2)
+12,1., 2750., 3.0e-5, 0.0e-11, 3.05, 1.25e-1, 2.76e+5, 4.0e+10, 3.5e+10, 0.0, 0.1, 30.0, 15.0, 4.e+7, 4.e+6,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;(7) basalt (extrustives), same as (3)
+12,1., 2900., 3.0e-5, 0.0e-11, 3.05, 1.25e-1, 2.76e+5, 4.3e+10, 4.3e+10, 0.0, 0.1, 30.0, 5.0, 44.e+6, 4.e+6,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;(8) olivine, same as (4), transformed from (9)
+12,1., 3300., 3.0e-5, 0.0e-11, 3.50, 1.1e+5 5.30e+5, 6.7e+10, 6.7e+10, 0.0, 5., 30.0, 30.0, 4.e+7, 4.e+6,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;(9) weak olivine (serpentinized peridotite), transformed from (4) and (8), if overlying subducted oceaninc crust phase (3), (7) or (11); transform back to (4) if deeper than 65 km
+12,1., 3000., 3.0e-5, 0.0e-11, 3.00, 7.00e+4, 1.20e+5, 5.0e+10, 3.0e+10, 0.0, 0.1,  15.0,  15.0, 4.e+6, 4.e+6,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;(10) sediment 2, not used
+12,1., 2500., 3.0e-5, 0.0e-11, 3.00, 5.00e2 , 2.00e+5, 3.0e+10, 3.0e+10, 0.0, 0.1,  5.0,  1.0, 4.e+6, 4.e+6,   0.0,   0.0, 2.3, 1000., 13000., 16000., 16000., 1.
+;(11) sediment 1, generated by erosion
+12,1., 2650., 3.0e-5, 0.0e-11, 3.00, 5.00e2 , 3.00e+5, 3.0e+10, 3.0e+10, 0.0, 0.1,  10.0,  5.0, 4.e+6, 4.e+6,   0.0,   0.0, 2.3, 1000., 13000., 16000., 16000., 1.
+;(12) weak crust, transformed from (2) and (6), if overlying oceanic crust (3), (7), (11), (14)
+12,1., 2800., 3.0e-5, 0.0e-11, 3.00, 3.0e-6, 1.80e+5, 4.3e+10, 3.5e+10, 0.0, 0.1, 20.0,  20.0, 4.e+7, 4.e+6,   0.0,   0.0, 2.3, 1000., 13000., 16000., 16000., 1.
+;(13) eclogite, transformed from (3) and (7), denser and more viscous
+12,1., 3370., 3.0e-5, 0.0e-11, 3.05, 1.25e-1, 4.50e+5, 7.0e+10, 7.0e+10, 0.0, 0.1, 30.0, 30.0, 4.e+7, 4.e+6,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;(14) buoyant arc
+12,1., 2850., 3.0e-5, 0.0e-11, 3.05, 1.25e-1, 8.76e+5, 3.0e+10, 3.0e+10, 0.0, 0.1, 30.0, 30.0, 4.e+7, 4.e+6,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;(15) weak middle crust, transformed from (2) and (6) if stressed and heated (disabled)
+12,1., 2750., 3.0e-5, 0.0e-11, 3.00, 5.00e2 , 2.00e+5, 3.0e+10, 3.0e+10, 0.0, 0.1,  30.0, 5.0,4.e+7, 4.e+6,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;(16) olivine, hydated (chlorite-containing)
+12,1., 3200., 3.0e-5, 0.0e-12, 3.00, 7.00e+4, 5.20e+5, 3.0e+10, 3.0e+10, 0.0, 0.1, 30.0, 15.0, 4.e+7, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
+;(17) metamorphic sedimentary rock, transformed from (10)
+12,1., 2800., 3.0e-5, 0.0e-11, 3.00, 5.00e2 , 2.00e+5, 3.0e+10, 3.0e+10, 0.0, 0.1, 30.0, 15.0, 4.e+7, 4.e+6,   0,     0,  3.3, 1000., 13000., 16000., 16000., 1.
+;(18) sills of gabbros
+12,1., 2900., 3.0e-5, 0.0e-11, 3.05, 1.25e-1, 2.76e+5, 4.3e+10, 4.3e+10, 0.0, 0.1, 30.0, 30.0, 4.e+7, 4.e+6,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;(19) khtmsz transformed from (4) and (8)
+12,1., 3300., 3.0e-5, 0.0e-11, 3.00, 7.00e+4, 2.20e+5, 6.7e+10, 6.7e+10, 0.0, 0.1,  30.0,  30.0,4.e+7,4.e+6,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;(20) Melted lower crust (Gerya, plagioclase)
+12,1., 2500., 3.0e-5, 0.0e-11, 3.2, 3.3e-4, 2.38e+5, 4.3e+10, 4.3e+10, 0.0, 0.1, 30.0,  30.0,4.e+7,4.e+7,   0.0,   0.0, 3.3, 1000., 13000., 16000., 16000., 1.
+;
+; INITIAL PHASE DISTRIBUTION
+0              ; irphase (0,1) read a distribution of phases
+phasedat.inp   ; file with distribution of phase on the 2D grid (phasedat)
+;
+; Initial heterogeneities
+;
+; Weak zone geometries:
+; 0- rectangular,
+; 3- diagonal line
+; 4- diagonal line plus init.plastic strain
+;
+; Thermal anomaly
+; 11- Gaussian shape (halfwidth=ix1-ix2, amplitude=amp), d
+;
+; Topography
+; 20- square, surface nodes ix1-ix2 elevated by amp
+; 21- trapzoidal, surface nodes linearly increase ix1-ix2, flat ix2-iy1,
+;     decrease iy1-iy2, max. elevated by amp
+;
+; Fixed low viscosity zone
+; 100- rectangular, viscosity=vis_min, for mid-ocean-ridge at sides
+;
+0  - inhom(number of inhomogenities)
+; ix1   ix2   iy1   iy2   phase   geometry    init.pl.strain
+;  75  88   1     10     2       4          3.
+;   40   50   3      8    -1      11          1.
+;
+; Tension cut off
+1.e+9
+;
+; linear healing parameter
+1.88943e13
+;
+; VISCOSITY LIMIT
+;vis_min (MINIMUM VISCOSITY) vis_max     ivis_shape,   efoldc
+1.0e+19,                     3.e+27,         2,         500.
+;
+;igeotherm  g_x0,     g_amplitude  g_width
+1,         125.e+3,   20.e+3,       30.e+3
+;Magma:
+; itype_melting, nelem_serp, prod_magma, rho_magma
+2,               2,          4e-13,      2900.
+; mzone_style (1:angle; 2:width), mzone_charact (0:degree, 1:meter)
+2,                                  100.e3
+; fmagma_max, ratio_crust_mzone, ratio_mantle_mzone
+0.3,          0.8,               0.
+; latent_heat_magma, lambda_freeze, lambda_freeze_tdep
+4.2e5,                1e-8,          2e-1
+; weaken_ratio_plastic, weaken_ratio_viscous
+1.,                   1.
+;
+;=================================================================
+;                       R e m e s h i n g
+;=================================================================
+;ny_rem (0,1), mode_rem(1, 3 or 11),  ntest_rem,  angle_rem(degrees,when magmainj le 10)
+1            3               100         10.
+;
+; dx_rem (if mode_rem=11 defines critical shortening for remeshing in dx-units)
+1.
+;
+; Diffusion of topography(1) and amplification factor for high elevation
+; topo_removal_rate     fac_kappa
+1.e-6	                     0.
+;
+;=================================================================
+;                   P r o c e s s   c o n t r o l
+;=================================================================
+; Inertial Mass Scaling (idt_scale):
+2         0-no scale for DYNAMICS,1-scale for STATICS, 2-Automatic scaling
+1,7.e-4  dt_scale (used if scale =1), tolerance=Vbc/Vsound (if scale=2)
+1,0.1   Buoyancy + Reynolds (no-0,yes-1), Reynolds number
+1        frequency of re-evaluation of real masses
+1       frequency of re-evaluation of inertial masses
+1       Freq. re-evaluation Non-Newtonian VISC (rheol.eq.12)
+10      Freq. averaging strain rate and dissipation
+;
+0.45,0.5        frac_elastic,frac_maxwell
+1,2                 movegrid (0-no,1-yes,2-move under strain_rate), ndim (num.dim.)
+0.8,1,1             damping, Mixing Procedures:mix1, mix2 (0,1),(strain,stress)
+;
+;======================================================================
+;                             O U T P U T
+;======================================================================
+; Time parameters below are in thousands years
+;
+; Max time of calculations (in Kyr)
+10001   ; change to 10000 to see subduction
+;
+; Time interval for screen output of calc. progress (in Kyr)
+10
+;
+; Time interval for file output (in Kyr)
+20
+;
+; Variables to print
+; vel srII eII aps sII sxx szz sxz pres temp melt visc phas mark src diss forc hfl topo
+1   1    1   1   1   1   1   1   1     1    1    1    1    1   1   1    1    1    1
+;
+; output for last step only (1) or each nout step (0)
+0
+;
+; Time interval for process saving
+20 - nsave (frequency of saving)
+;
+; saving the last step only (1) or each nsave step (0)
+1

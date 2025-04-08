@@ -19,7 +19,7 @@ def read_data(fl, frame):
     stuff.szz = fl.read_szz(frame)
     stuff.sxz = fl.read_sxz(frame)
 
-    stuff.m_x, stuff.m_z, stuff.m_age, stuff.m_phase, stuff.m_ID = \
+    stuff.m_x, stuff.m_z, stuff.m_age, stuff.m_phase, stuff.m_ID ,_ ,_ ,_ = \
         fl.read_markers(frame)
     return stuff
 

@@ -9,10 +9,10 @@ real*8, intent(in) :: bulkm, rmu0, viscosity, de11, de22, de33, de12, dv, dt
 real*8, intent(inout) :: s11, s22, s33, s12
 
 real*8, parameter :: c1d3 = 1.d0/3.d0
-real*8, parameter :: visc_cut = 1.d+19
+real*8, parameter :: visc_cut = 1.d+17
 
 real*8 rmu, temp, vic1, vic2, dev, de11d, de22d, de33d, s0, s11d, s22d, s33d
-character*200 msgstr
+! character*200 msgstr
 
 if( viscosity .lt. visc_cut ) then
     rmu = rmu0 * viscosity/visc_cut
@@ -23,11 +23,11 @@ end if
 ! Undimensional parametr:  dt / relaxation time
 temp = rmu/(2*viscosity) * dt 
 
-if ( temp .gt. 0.5d0 ) then
-!    write( msgstr, '(A,A,e8.1,A,e7.1,A,e7.1)' ) 'Maxwell: time step!',' visc=',viscosity,' m0=',rmu0,' m=',rmu
-!    call SysMsg(msgstr)
-    stop 22
-endif 
+! if ( temp .gt. 0.5d0 ) then
+!     write( msgstr, '(A,A,e8.1,A,e7.1,A,e7.1)' ) 'Maxwell: time step!',' visc=',viscosity,' m0=',rmu0,' m=',rmu
+!     call SysMsg(msgstr)
+!     stop 22
+! endif 
      
 vic1 = 1 - temp 
 vic2 = 1.0d0/(1.0d0 + temp)
@@ -60,10 +60,10 @@ else
 endif
 
 ! new deviatoric stresses
-s11d = (s11d * vic1 + 2 * rmu * de11d) * vic2
-s22d = (s22d * vic1 + 2 * rmu * de22d) * vic2
-s33d = (s33d * vic1 + 2 * rmu * de33d) * vic2
-s12  = (s12  * vic1 + 2 * rmu * de12 ) * vic2
+s11d = (s11d * vic1 + 2. * rmu * de11d) * vic2
+s22d = (s22d * vic1 + 2. * rmu * de22d) * vic2
+s33d = (s33d * vic1 + 2. * rmu * de33d) * vic2
+s12  = (s12  * vic1 + 2. * rmu * de12 ) * vic2
 
 s0 = s0 + bulkm * dv
 

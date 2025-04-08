@@ -43,6 +43,11 @@ open (1,file='extr_acc.rs',access='direct',recl=(nx-1)*kindr)
 write (1,rec=nrec) extr_acc(1:nx-1)
 close (1)
 
+open (1,file='xlab.rs',access='direct',recl=nx*kindr)
+write (1,rec=nrec) xlab(1:nx)
+close (1)
+
+
 open (1,file='vel.rs',access='direct',recl=nwords*kindr) 
 write (1,rec=nrec) vel
 close (1)
@@ -89,6 +94,21 @@ open (1,file='fmagma.rs',access='direct',recl=nwords*kindr)
 write (1,rec=nrec) fmagma
 close (1)
 
+!melt
+open (1,file='melt.rs',access='direct',recl=nwords*kindr) 
+write (1,rec=nrec) Eff_melt
+close (1)
+
+!stored_intrusion
+open (1,file='stored_intru.rs',access='direct',recl=nwords*kindr) 
+write (1,rec=nrec) stored_intrusion
+close (1)
+
+!dv_intr
+open (1,file='dv_intr.rs',access='direct',recl=nwords*kindr) 
+write (1,rec=nrec) dv_intr
+close (1)
+
 ! Heat sources
 open (1,file='source.rs',access='direct',recl=nwords*kindr) 
 write (1,rec=nrec) source
@@ -110,6 +130,10 @@ nrec = nrec + 1
 write (1,rec=nrec) mark_y(1:nmarkers)
 nrec = nrec + 1
 write (1,rec=nrec) mark_age(1:nmarkers)
+nrec = nrec + 1
+write (1,rec=nrec) mark_zpressn(1:nmarkers)
+nrec = nrec + 1
+write (1,rec=nrec) mark_Emeltm(1:nmarkers)
 nrec = nrec + 1
 close (1)
 

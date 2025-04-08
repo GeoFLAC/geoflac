@@ -8,8 +8,6 @@ use arrays
 use params
 include 'precision.inc'
 
-double precision :: D(3,3)  ! diffusion operator
-
 tan_mzone = tan(0.5d0 * angle_mzone * 3.14159265358979323846d0 / 180.d0)
 ! max. width of the magma zone @ moho (as if melting occurs at 200 km)
 ihalfwidth_mzone = ceiling(tan_mzone * 200e3 / dxmin)
@@ -37,12 +35,7 @@ if (istress_therm > 0 .or. itype_melting == 1) then
     !$ACC end kernels
 endif
 
-!$OMP Parallel private(i,j,iph,cp_eff,cond_eff,dissip,diff,quad_area, &
-!$OMP                  x1,x2,x3,x4,y1,y2,y3,y4,t1,t2,t3,t4,tmpr,fr_lambda, &
-!$OMP                  delta_fmagma,deltaT,qs,real_area13,area_n,rhs, &
-!$OMP                  jm,area_ratio,z_moho,z_melt,x_melt,h,x,z)
-
-if (itype_melting == 1) then
+if (itype_melting .ge. 1) then
     ! M: fmegma, magma fraction in the element
     ! dM/dt = P - M * fr_lambda
     ! Rearrange after forward Euler for dM/dt
@@ -64,84 +57,86 @@ if (itype_melting == 1) then
     ! Rearrage to: deltaT = delta_fmagma * latent_heat / cp
     ! This heat is distributed to the 4 corners evenly
     !
-    !$OMP do
+    do iblk = 1, 2
+    do jblk = 1, 2
+    !$OMP parallel do private(iblk,jblk,i,j,cp_eff,tmpr,fr_lambda,delta_fmagma,deltaT) collapse(2)
     !$ACC parallel loop collapse(2) async(1)
-    do i = 1,nx-1
-        do j = 1,nz-1
+    do i = iblk,nx-1,2
+        do j = jblk,nz-1,2
             cp_eff = Eff_cp( j,i )
             tmpr = 0.25d0*(temp0(j,i)+temp0(j+1,i)+temp0(j,i+1)+temp0(j+1,i+1))
             fr_lambda = lambda_freeze * exp(-lambda_freeze_tdep * (tmpr-t_top))
             delta_fmagma = min(fmagma(j,i), fmagma(j,i) * dt * fr_lambda)
             fmagma(j,i) = fmagma(j,i) - delta_fmagma
 
+            fmagma(j,i) = max(0.d0,fmagma(j,i))
+            xfmelt(j,i) = fmagma(j,i)
+
             ! latent heat released by freezing magma
             deltaT = delta_fmagma * latent_heat_magma / cp_eff / 4
-            !$OMP atomic update
-            !$ACC atomic update
             temp(j  ,i  ) = temp(j  ,i  ) + deltaT
-            !$OMP atomic update
-            !$ACC atomic update
             temp(j  ,i+1) = temp(j  ,i+1) + deltaT
-            !$OMP atomic update
-            !$ACC atomic update
             temp(j+1,i  ) = temp(j+1,i  ) + deltaT
-            !$OMP atomic update
-            !$ACC atomic update
             temp(j+1,i+1) = temp(j+1,i+1) + deltaT
         end do
     enddo
-    !$OMP end do
-
-    !$OMP do
-    !$ACC parallel loop collapse(2) async(1)
-    do i = 1,nx-1
-        ! XXX: Assume melting cannot happen above the moho. (j > jmoho(i)) is always true
-        ! starting from j=1, not jmoho(i), so that the loop can be collapsed and faster in computation
-        do j = 1,nz-1
-            jm = jmoho(i)
-            quad_area = 0.5d0/area(j,i,1) + 0.5d0/area(j,i,2) ! area of this element
-            if (j>jm .and. fmelt(j,i) > 0) then
-                ! This element is under melting. The melt will migrate to the
-                ! mantle and crust above. Treat the migration as instantaneous.
-
-                ! Within crust, melts migrate by diking, propagate upward vertically
-                ! area_ratio: the area of the crust column / the area of the melting element
-                !     ~ the thickness of the crust column / the thickness of the melting element
-                area_ratio = (cord(1,i,2)+cord(1,i+1,2)-cord(jm,i,2)-cord(jm,i+1,2)) / &
-                    (cord(j,i,2)+cord(j,i+1,2)-cord(j+1,i,2)-cord(j+1,i+1,2))
-                do jj = 1, jm
-                    !$OMP atomic update
-                    !$ACC atomic update
-                    fmagma(jj,i) = fmagma(jj,i) + fmelt(j,i) * (1d0 - ratio_mantle_mzone) * area_ratio * prod_magma * dt
-                enddo
-
-                ! Within mantle, melts migrate by percolation, propagate upward slantly
-                z_moho = 0.5d0 * (cord(jm,i,2) + cord(jm,i+1,2))
-                z_melt = 0.5d0 * (cord(j+1,i,2) + cord(j+1,i+1,2))
-                x_melt = 0.5d0 * (cord(j+1,i,1) + cord(j+1,i+1,1))
-                h = z_moho - z_melt
-                ! area_ratio: the area of the mantle triangle / the area of the melting element
-                area_ratio = h * h * tan_mzone / quad_area
-                ! ii: the potential region of magma distribution zone at moho
-                do ii = max(1,i-ihalfwidth_mzone), min(nx-1,i+ihalfwidth_mzone)
-                    do jj = jmoho(ii)+1, j
-                        x = 0.5d0 * (cord(jj,ii,1) + cord(jj,ii+1,1))
-                        z = 0.5d0 * (cord(jj,ii,2) + cord(jj,ii+1,2))
-                        if (abs(x - x_melt) <= tan_mzone * (z - z_melt)) then
-                            !$OMP atomic update
-                            !$ACC atomic update
-                            fmagma(jj,ii) = fmagma(jj,ii) + fmelt(j,i) * ratio_mantle_mzone * area_ratio * prod_magma * dt
-                        endif
-                    enddo
-                enddo
-            endif
-            fmagma(j,i) = min(fmagma(j,i), fmagma_max)
-        enddo
+    !$OMP end parallel do
     enddo
+    enddo
+
+    if (itype_melting .eq. 1) then
+        !$OMP parallel do private(i,j,jm,quad_area,area_ratio,ii,jj,z_moho,z_melt,x_melt,h,x,z) &
+        !$OMP                  collapse(2)
+        !$ACC parallel loop collapse(2) async(1)
+        do i = 1,nx-1
+            ! XXX: Assume melting cannot happen above the moho. (j > jmoho(i)) is always true
+            ! starting from j=1, not jmoho(i), so that the loop can be collapsed and faster in computation
+            do j = 1,nz-1
+                jm = jmoho(i)
+                quad_area = 0.5d0/area(j,i,1) + 0.5d0/area(j,i,2) ! area of this element
+                if (j>jm .and. fmelt(j,i) > 0) then
+                    ! This element is under melting. The melt will migrate to the
+                    ! mantle and crust above. Treat the migration as instantaneous.
+
+                    ! Within crust, melts migrate by diking, propagate upward vertically
+                    ! area_ratio: the area of the crust column / the area of the melting element
+                    !     ~ the thickness of the crust column / the thickness of the melting element
+                    area_ratio = (cord(1,i,2)+cord(1,i+1,2)-cord(jm,i,2)-cord(jm,i+1,2)) / &
+                        (cord(j,i,2)+cord(j,i+1,2)-cord(j+1,i,2)-cord(j+1,i+1,2))
+                    do jj = 1, jm
+                        !$OMP atomic update
+                        !$ACC atomic update
+                        fmagma(jj,i) = fmagma(jj,i) + fmelt(j,i) * (1d0 - ratio_mantle_mzone) * area_ratio * prod_magma * dt
+                    enddo
+
+                    ! Within mantle, melts migrate by percolation, propagate upward slantly
+                    z_moho = 0.5d0 * (cord(jm,i,2) + cord(jm,i+1,2))
+                    z_melt = 0.5d0 * (cord(j+1,i,2) + cord(j+1,i+1,2))
+                    x_melt = 0.5d0 * (cord(j+1,i,1) + cord(j+1,i+1,1))
+                    h = z_moho - z_melt
+                    ! area_ratio: the area of the mantle triangle / the area of the melting element
+                    area_ratio = h * h * tan_mzone / quad_area
+                    ! ii: the potential region of magma distribution zone at moho
+                    do ii = max(1,i-ihalfwidth_mzone), min(nx-1,i+ihalfwidth_mzone)
+                        do jj = jmoho(ii)+1, j
+                            x = 0.5d0 * (cord(jj,ii,1) + cord(jj,ii+1,1))
+                            z = 0.5d0 * (cord(jj,ii,2) + cord(jj,ii+1,2))
+                            if (abs(x - x_melt) <= tan_mzone * (z - z_melt)) then
+                                !$OMP atomic update
+                                !$ACC atomic update
+                                fmagma(jj,ii) = fmagma(jj,ii) + fmelt(j,i) * ratio_mantle_mzone * area_ratio * prod_magma * dt
+                            endif
+                        enddo
+                    enddo
+                endif
+                fmagma(j,i) = min(fmagma(j,i), fmagma_max)
+            enddo
+        enddo
+    end if
 endif
 
 !$ACC parallel loop collapse(2) async(1)
-!$OMP do
+!$OMP parallel do private(i,j,iph,cp_eff,dissip,diff,x1,x2,x3,x4,y1,y2,y3,y4,t1,t2,t3,t4) collapse(2)
 do i = 1,nx-1
     do j = 1,nz-1
 
@@ -149,7 +144,6 @@ do i = 1,nx-1
 
         ! Calculating effective material properties
         cp_eff = Eff_cp( j,i )
-        cond_eff = Eff_conduct( j,i )
 
         ! if shearh-heating flag is true
         if( ishearh.eq.1 .and. itherm.ne.2 ) then
@@ -159,7 +153,7 @@ do i = 1,nx-1
         endif
 
         ! diffusivity
-        diff = cond_eff/den(iph)/cp_eff
+        diff = Eff_conduct( j,i ) / den(iph) / cp_eff
 
         ! Calculate fluxes in two triangles
         x1 = cord (j  ,i  ,1)
@@ -176,8 +170,8 @@ do i = 1,nx-1
         t4 = temp (j+1 ,i+1)
 
         ! Additional sources - radiogenic and shear heating
-        tmpr = 0.25d0*(t1 + t2 + t3 + t4)
-        !dummye(j,i) = ( source(j,i) + dissip/den(iph) - 600.d0*cp_eff*Eff_melt(iph,tmpr)) / cp_eff
+        zpressm(j,i) = -stressI(j,i)
+
         dummye(j,i) = ( source(j,i) + dissip/den(iph) ) / cp_eff
 
         ! (1) A element:
@@ -190,10 +184,10 @@ do i = 1,nx-1
 
     end do
 end do    
-!$OMP end do
+!$OMP end parallel do
 
 !$ACC parallel loop collapse(2) async(1)
-!$OMP do
+!$OMP parallel do private(i,j,rhs,area_n,qs,real_area13) collapse(2)
 do i = 1,nx
     do j = 1,nz
 
@@ -312,34 +306,43 @@ do i = 1,nx
         temp(j,i) = temp(j,i)+rhs*dt/area_n
     end do
 end do
-!$OMP end do
+!$OMP end parallel do
 
 ! Boundary conditions (top and bottom)
 !$ACC parallel loop async(1)
-!$OMP do
-do i = 1,nx
+!$OMP parallel do private(i,j,y)
+do i = 1,nx-1
 
     temp(1,i) = t_top
 
     if( itemp_bc.eq.1 ) then
         temp(nz,i) = bot_bc
     elseif( itemp_bc.eq.2 ) then
-        cond_eff = Eff_conduct( nz-1, min(i,nx-1) )
-        temp(nz,i) = temp(nz-1,i)  +  bot_bc * ( cord(nz-1,i,2)-cord(nz,i,2) ) / cond_eff
+        temp(nz,i) = temp(nz-1,i)  +  bot_bc * ( cord(nz-1,i,2)-cord(nz,i,2) ) / Eff_conduct( nz-1, min(i,nx-1) )
+    else if (itemp_bc.eq.3) then
+        do j  = 1,nz-1
+            if (Eff_melt(j,i).eq.0.) then
+                y = (cord(1,i,2)-cord(j,i,2))*1.e-3
+            
+                if (y.gt.xlab(i)) then  ! xlab is 180 km
+                    ! Asth Pot Temp - McKenBickle 1988 Eqn 5
+                    temp(j,i) = bot_bc*exp(9.81*y*0.00004)
+                end if
+            endif
+        enddo
     endif
 
 end do
-!$OMP end do
+!$OMP end parallel do
 
 ! Boundary conditions: dt/dx =0 on left and right  
 !$ACC parallel loop async(1)
-!$OMP do
+!$OMP parallel do private(j)
 do j = 1,nz
     temp(j ,1)  = temp(j,2)
     temp(j, nx) = temp(j,nx-1)
 end do
-!$OMP end do
-!$OMP end parallel
+!$OMP end parallel do
 
 return
 end 

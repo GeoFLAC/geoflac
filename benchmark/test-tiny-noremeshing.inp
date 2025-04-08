@@ -91,9 +91,6 @@
 ; Bottom Boundary conditions flag and value (1- temperature, 2- heat flux in mW/m2 ) 
 1 1330. 
 ;
-; Initial additional perturbation (quadralateral)
-0.,40,50,3,8          - temp_per,ix1,ix2,iy1,iy2 (box of thermal perturbation)
-;
 ; Predefined distributions
 0              irtemp (0,1) (read temperature file or not)
 proftemp.dat   temperature profile dat.file
@@ -201,8 +198,8 @@ phasedat.inp   ; file with distribution of phase on the 2D grid (phasedat)
 ;vis_min (MINIMUM VISCOSITY) vis_max     ivis_shape,   efoldc
 1.0e+20,                     3.e+27,         2,         500.
 ;
-;igeotherm  g_x0,    g_y0c   g_amplitude  g_width
-0,         75.e+3,  -11.e+3,  2.e+3,       10.e+3
+;igeotherm  g_x0,     g_amplitude  g_width
+0,         75.e+3,   2.e+3,       10.e+3
 ;
 ;Magma Injection: 
 ; ny_inject (0,-no,1-left,2-center), nelem_inject, rate_inject(m/s)

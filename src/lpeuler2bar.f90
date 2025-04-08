@@ -6,11 +6,17 @@ use params
 
 include 'precision.inc'
 
-character*200 msg
-
 !$ACC kernels async(1)
+!$OMP sections
+!$OMP section
 mark_id_elem(:,:,:) = 0
+!$OMP section
 nmark_elem(:,:) = 0
+!$OMP section
+Emeltcounter(:,:) = 0.
+!$OMP section
+zpresscounter(:,:) = 0.
+!$OMP end sections
 !$ACC end kernels
 
 !$OMP parallel do private(n,k,j,i,xx,yy,bar1,bar2,ntr,inc)
@@ -50,9 +56,14 @@ do n = 1 , nmarkers
     !$ACC end atomic
     !$OMP end atomic
     mark_id_elem(kk, j, i) = n
+    !$ACC atomic update
+    !$OMP atomic update
+    zpresscounter(j,i) = zpresscounter(j,i) + mark_zpressn(n)
+    !$ACC atomic update
+    !$OMP atomic update
+    Emeltcounter(j,i) = Emeltcounter(j,i) + mark_Emeltm(n)
 enddo
 !$OMP end parallel do
 
 return
-
 end subroutine lpeuler2bar

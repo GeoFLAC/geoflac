@@ -1,12 +1,12 @@
 !------ Elasto-Plastic
 
-subroutine plastic(bulkm,rmu,coh,phi,psi,depls,ipls,diss,hardn,s11,s22,s33,s12,de11,de22,de33,de12,&
+subroutine plastic(bulkm,rmu,coh,phi,psi,depls,ipls,diss,hardn,s11,s22,s33,s12,de11,de22,de33,de12,dv1,&
      ten_off,ndim)
 !$ACC routine seq
 implicit none
 
 integer, intent(in) :: ndim
-real*8, intent(in) :: bulkm, rmu, coh, phi, psi, hardn, de11, de22, de33, de12, ten_off
+real*8, intent(in) :: bulkm, rmu, coh, phi, psi, hardn, de11, de22, de33, de12, ten_off,dv1
 real*8, intent(inout) :: s11, s22, s33, s12
 real*8, intent(out) :: depls, diss
 integer, intent(out) :: ipls
@@ -53,8 +53,8 @@ end if
 !---- add press (which is positive press = - (sxx+syy)*0.5, 
 !---- which has 2 components: add pressure due to application of forces from the top 
 !---- and subtract pressure of the fluid
-s11i = s11 + (de22 + de33) *e2  + de11 *e1 - press_add
-s22i = s22 + (de11 + de33) *e2  + de22 *e1 - press_add
+s11i = s11 + (de22 + 0.5*dv1 + de33) *e2  + (de11 + 0.5*dv1) *e1 - press_add
+s22i = s22 + (de11 + 0.5*dv1 + de33) *e2  + (de22 + 0.5*dv1) *e1 - press_add
 s12i = s12 + de12 * 2.0d0 * rmu
 s33i = s33 + (de11 + de22) *e2  + de33 *e1 - press_add
 sdif = s11i - s22i
@@ -246,6 +246,7 @@ subroutine pre_plast (i,j,coh,phi,psi,hardn)
 !$ACC routine seq
 use arrays
 use params
+use phases
 include 'precision.inc'
 
 pls_curr = aps(j,i)
@@ -273,13 +274,19 @@ do iph = 1, nphase
         d = dilat1(iph) + (dilat2(iph) - dilat1(iph)) * dpl
         c = cohesion1(iph) + (cohesion2(iph) - cohesion1(iph)) * dpl
         h = (cohesion2(iph) - cohesion1(iph)) / (plstrain2(iph) - plstrain1(iph))
-    else
+        if(iph.eq.kcont1 .or. iph.eq.kmant1) then
+            if(i.le.140.or.i.ge.360) f=fric1(iph)  !+ (35. - fric1(iph)) * dpl
+        endif 
+     else
         ! saturated weakening
         f = fric2(iph)
         c = cohesion2(iph)
         d = dilat2(iph)
         h = 0
-    endif
+        if(iph.eq.kcont1 .or. iph.eq.kmant1) then
+            if(i.le.140.or.i.ge.360) f=fric1(iph)  !+ (35. - fric1(iph)) * dpl
+         endif 
+     endif
 
     ! using harmonic mean on friction and cohesion
     ! using arithmatic mean on dilation and hardening
@@ -293,9 +300,9 @@ enddo
 phi = 1 / phi
 coh = 1 / coh
 
-if (itype_melting == 1) then
-    phi = phi * (1 - (1 - weaken_ratio_plastic) * fmagma(j,i) / fmagma_max)
-    coh = coh * (1 - (1 - weaken_ratio_plastic) * fmagma(j,i) / fmagma_max)
+if (itype_melting .ge. 1) then
+    phi = phi * (1. - (1. - weaken_ratio_plastic) * fmagma(j,i) / fmagma_max)
+    coh = coh * (1. - (1. - weaken_ratio_plastic) * fmagma(j,i) / fmagma_max)
 endif
 
 return
