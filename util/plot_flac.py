@@ -253,7 +253,7 @@ cut -f1,4 %(gfile)s | gmt psxy -J -R -A -Wthin,blue,-- -P -K -O >> %(psfile)s
 
 gmt psscale -C%(phcpt)s -D6.75/-2.5/2.5/0.3 -Ba1f0.5 -V -O -K >> %(psfile)s
 gmt psscale -C%(strain_ratecpt)s -D6.75/-7/2.5/0.3 -Ba1f0.5 -V -O -K >> %(psfile)s
-gmt psscale -C%(stresscpt)s -D6.75/-11.5/2.5/0.3 -Ba2f0.5 -V -O -K >> %(psfile)s
+gmt psscale -C%(stresscpt)s -D6.75/-11.5/2.5/0.3 -Ba2e8f5e7 -V -O -K >> %(psfile)s
 
 echo %(xmin)f %(topogridsize)d 14 0 1 LB "Model=%(model)s   Frame=%(frame)d   Trench location=%(xtrench).3f km" | gmt pstext -D0/1 -N -J -R -P -O >> %(psfile)s
 convert -density 150 %(psfile)s %(pngfile)s

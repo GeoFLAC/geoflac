@@ -8,19 +8,20 @@ USE marker_data
 implicit none
 
 integer, parameter :: kindr=8, kindi=4
-integer :: nrec, nwords, i, j, k, iph, n
+integer :: nrec, nwords, i, j, k, iph, n, u, ios
 real*8 rtime, rdt, time_my
 character*200 msg
+integer(kindi), allocatable :: ibuf(:)   ! widening buffer for byte-sized marker fields
 
-open( 1, file='_contents.rs', status='old' )
-read( 1, * ) nrec, nloop, time_my, nmarkers, i
-close(1)
+open(newunit=u, file='_contents.rs', status='old' )
+read(u, * ) nrec, nloop, time_my, nmarkers, i
+close(u)
 
 
 ! Read time and dt
-open (1,file='time.rs',access='direct',recl=2*8) 
-read (1,rec=nrec) rtime, rdt
-close (1)
+open(newunit=u, file='time.rs', access='direct', recl=2*8) 
+read(u, rec=nrec) rtime, rdt
+close(u)
 time = rtime
 dt = rdt
 
@@ -29,35 +30,42 @@ dvol = 0
 ! Coordinates and velocities
 nwords = nz*nx*2
 
-open (1,file='cord.rs',access='direct',recl=nwords*kindr) 
-read (1,rec=nrec) cord
-close (1)
+open(newunit=u, file='cord.rs', access='direct', recl=nwords*kindr) 
+read(u, rec=nrec) cord
+close(u)
 
 ! min element width and thickness
 dxmin = minval(cord(1,2:nx,1) - cord(1,1:nx-1,1))
 dzmin = minval(cord(1:nz-1,1,2) - cord(2:nz,1,2))
 
-open (1,file='dhacc.rs',access='direct',recl=(nx-1)*kindr)
-read (1,rec=nrec) dhacc(1:nx-1)
-close (1)
+open(newunit=u, file='dhacc.rs', access='direct', recl=(nx-1)*kindr)
+read(u, rec=nrec) dhacc(1:nx-1)
+close(u)
 
-open (1,file='extr_acc.rs',access='direct',recl=(nx-1)*kindr)
-read (1,rec=nrec) extr_acc(1:nx-1)
-close (1)
+open(newunit=u, file='dhacc_corr.rs', access='direct', recl=nx*kindr)
+read(u, rec=nrec) dhacc_correction(1:nx)
+close(u)
+!$ACC update device(dhacc, dhacc_correction) async(1)
 
-open (1,file='q_init.rs',access='direct',recl=nx*kindr,status='old',err=101)
-read (1,rec=nrec) q_init
-close (1)
-goto 102
-101 q_init = 0.d0
-102 continue
+open(newunit=u, file='extr_acc.rs', access='direct', recl=(nx-1)*kindr)
+read(u, rec=nrec) extr_acc(1:nx-1)
+close(u)
 
-open (1,file='vel_flex_old.rs',access='direct',recl=nx*kindr,status='old',err=103)
-read (1,rec=nrec) vel_flex_old
-close (1)
-goto 104
-103 vel_flex_old = 0.d0
-104 continue
+open(newunit=u, file='q_init.rs', access='direct', recl=nx*kindr, status='old', iostat=ios)
+if (ios == 0) then
+    read(u, rec=nrec) q_init
+    close(u)
+else
+    q_init = 0.d0
+endif
+
+open(newunit=u, file='vel_flex_old.rs', access='direct', recl=nx*kindr, status='old', iostat=ios)
+if (ios == 0) then
+    read(u, rec=nrec) vel_flex_old
+    close(u)
+else
+    vel_flex_old = 0.d0
+endif
 
 open (1,file='vel.rs',access='direct',recl=nwords*kindr) 
 read (1,rec=nrec) vel
@@ -117,12 +125,36 @@ open (1,file='fmagma.rs',access='direct',recl=nwords*kindr)
 read (1,rec=nrec) fmagma
 close (1)
 
+! Magma2
+open (1,file='fmagma2.rs',access='direct',recl=nwords*kindr)
+read (1,rec=nrec) fmagma2
+close (1)
+
 ! Heat sources
-open (1,file='source.rs',access='direct',recl=nwords*kindr) 
+open (1,file='source.rs',access='direct',recl=nwords*kindr)
 read (1,rec=nrec) source
 close (1)
 
+! Dike-intrusion eigenstrain/marker tracking (persistent parts only)
+open (1,file='dike_backlog.rs',access='direct',recl=nwords*kindr)
+read (1,rec=nrec) dike_backlog
+close (1)
+open (1,file='dike_marker_vol.rs',access='direct',recl=nwords*kindr)
+read (1,rec=nrec) dike_marker_vol
+close (1)
+open (1,file='mor_marker_vol.rs',access='direct',recl=nwords*kindr)
+read (1,rec=nrec) mor_marker_vol
+close (1)
+
+! Minimum element area of the initial grid (see setflac.f90)
+open(newunit=u, file='Amin.rs')
+read(u,*) Amin
+close(u)
+!$ACC update device(Amin) async(1)
+
 ! Markers
+! Euler (x,y) coordinates are not part of the restart file; see the
+! matching comment in saveflac.f90.
 nwords = nmarkers
 nrec = 1
 open (1,file='marker1.rs',access='direct',recl=nwords*kindr)
@@ -130,25 +162,27 @@ read (1,rec=nrec) mark_a1(1:nmarkers)
 nrec = nrec + 1
 read (1,rec=nrec) mark_a2(1:nmarkers)
 nrec = nrec + 1
-read (1,rec=nrec) mark_x(1:nmarkers)
-nrec = nrec + 1
-read (1,rec=nrec) mark_y(1:nmarkers)
-nrec = nrec + 1
 read (1,rec=nrec) mark_age(1:nmarkers)
 nrec = nrec + 1
 close (1)
 
+! marker2.rs stores each field as a full-width (kindi=4) record regardless
+! of the in-memory type, so mark_dead/mark_phase (1 byte each) are read
+! into the 4-byte ibuf and narrowed explicitly; mark_ntriag is already
+! full width and can be read directly.
+allocate(ibuf(nmarkers))
 nrec = 1
 open (1,file='marker2.rs',access='direct',recl=nwords*kindi)
-read (1,rec=nrec) mark_dead(1:nmarkers)
+read (1,rec=nrec) ibuf
+mark_dead(1:nmarkers) = int(ibuf, 1)
 nrec = nrec + 1
 read (1,rec=nrec) mark_ntriag(1:nmarkers)
 nrec = nrec + 1
-read (1,rec=nrec) mark_phase(1:nmarkers)
-nrec = nrec + 1
-read (1,rec=nrec) mark_ID(1:nmarkers)
+read (1,rec=nrec) ibuf
+mark_phase(1:nmarkers) = int(ibuf, 1)
 nrec = nrec + 1
 close (1)
+deallocate(ibuf)
 
 ! recount marker phase
 mark_id_elem(:,:,:) = 0
@@ -158,7 +192,7 @@ do n = 1, nmarkers
     if(mark_dead(n) .eq. 0) cycle
 
      if(mark_ntriag(n).lt.1 .or. mark_ntriag(n).gt.2*(nx-1)*(nz-1)) then
-         print *, 'Wrong marker ntriag', mark_ID(n), mark_ntriag(n)
+         print *, 'Wrong marker ntriag', n, mark_ntriag(n)
          stop 999
      endif
 
@@ -197,13 +231,16 @@ call init_areas
 call init_bc
 
 temp0 = temp
+!$ACC kernels async(1)
 shrheat = 0
 sshrheat = 0
 dtopo = 0
 extrusion = 0
 fmelt = 0
+fmelt2 = 0
 se2sr = 1d-16
 e2sr = 1d-16
+!$ACC end kernels
 
 call update_acc
 
@@ -218,6 +255,12 @@ call dt_mass
 ! Initiate parameters for stress averaging
 dtavg=0
 nsrate=-1
+istart_profile = 50
+! dtavg/nsrate are reset after update_acc's bulk push above (which must
+! run before rmasses/init_visc/dt_mass, since those need nx, nz, and the
+! other params scalars/small arrays already on device); push these two
+! explicitly so the device copy doesn't retain a stale pre-reset value.
+!$ACC update device(dtavg, nsrate) async(1)
 
 return
 end

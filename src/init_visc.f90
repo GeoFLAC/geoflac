@@ -3,8 +3,9 @@ subroutine init_visc
   !$ACC routine(Eff_visc) seq
   use arrays
   use params
-  include 'precision.inc'
-
+  implicit none
+  integer :: i, j
+  double precision :: Eff_visc
   !$OMP parallel do
   !$ACC parallel loop collapse(2) async(1)
   do i = 1,nx-1

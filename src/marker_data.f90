@@ -5,13 +5,15 @@ MODULE marker_data
   integer, parameter :: max_markers_per_elem=32
 
   SAVE
-  double precision, allocatable :: mark_a1(:), mark_a2(:) ! baricentric coordinates
-  double precision, allocatable :: mark_x(:), mark_y(:)   ! Euler coordinates
+  ! baricentric coordinates. Euler (absolute x,y) coordinates are NOT stored
+  ! persistently: they're fully recoverable from (mark_a1, mark_a2,
+  ! mark_ntriag) plus the current cord array, via bar2euler(). Computed
+  ! transiently wherever needed (see bar2euler.f90).
+  double precision, allocatable :: mark_a1(:), mark_a2(:)
   double precision, allocatable :: mark_age(:)            ! creation time
-  integer, allocatable :: mark_dead(:)
-  integer, allocatable :: mark_ntriag(:)      ! number of FE-triangle
-  integer, allocatable :: mark_phase(:)
-  integer, allocatable :: mark_ID(:)          ! unique ID-number
+  integer(1), allocatable :: mark_dead(:)     ! 0 or 1, fits in 1 byte
+  integer, allocatable :: mark_ntriag(:)      ! global triangle index, up to 2*(nx-1)*(nz-1); needs full width
+  integer(1), allocatable :: mark_phase(:)    ! phase id, fits in 1 byte (< 128 phases)
 
   integer, allocatable :: mark_id_elem(:,:,:), nmark_elem(:,:)
   !$ACC declare create(max_markers)
@@ -26,12 +28,10 @@ MODULE marker_data
     !$ACC update device(max_markers) async(1)
 
     allocate(mark_a1(max_markers), mark_a2(max_markers), &
-             mark_x(max_markers), mark_y(max_markers), &
              mark_age(max_markers), &
              mark_dead(max_markers), &
              mark_ntriag(max_markers), &
-             mark_phase(max_markers), &
-             mark_ID(max_markers))
+             mark_phase(max_markers))
 
     allocate(mark_id_elem(max_markers_per_elem, nz-1, nx-1))
     allocate(nmark_elem(nz-1, nx-1))
@@ -50,8 +50,9 @@ MODULE marker_data
     use arrays
     use params
     implicit none
-    integer :: iph, j, i, inc
-    double precision :: x, y, age
+    double precision, intent(in) :: x, y, age
+    integer, intent(in) :: iph, j, i
+    integer, intent(out) :: inc
     integer :: ntr, kk, nm
     double precision :: bar1, bar2
     !character*200 msg
@@ -76,7 +77,16 @@ MODULE marker_data
     if(nm > max_markers_per_elem .or. kk > max_markers) then
         !write(msg*) 'Too many markers at element:', i, j, nm
         !call SysMsg(msg)
-        !call SysMsg('Marker skipped, not added!')
+        call SysMsg('Marker skipped, not added!')
+          
+        !$OMP atomic update
+        !$ACC atomic update
+        nmarkers = nmarkers - 1
+
+        !$OMP atomic update
+        !$ACC atomic update
+        nmark_elem(j,i) = nmark_elem(j,i) - 1
+    
         inc = -1
         return
     endif
@@ -84,15 +94,12 @@ MODULE marker_data
     ! recording the id of markers belonging to the element
     mark_id_elem(nm,j,i) = kk
 
-    mark_x(kk) = x
-    mark_y(kk) = y
     mark_dead(kk) = 1
-    mark_ID(kk) = kk
     mark_a1(kk) = bar1
     mark_a2(kk) = bar2
     mark_age(kk) = age
     mark_ntriag(kk) = ntr
-    mark_phase(kk) = iph
+    mark_phase(kk) = int(iph, 1)
 
   end subroutine add_marker
 
@@ -103,8 +110,8 @@ MODULE marker_data
     use params
     implicit none
     
-    integer :: j1, j2, i1, i2, iph, &
-               kk, n, j, i
+    integer, intent(in) :: j1, j2, i1, i2, iph
+    integer :: kk, n, j, i
 
     ! reset the markers within elements in the rectangular region
     !$OMP parallel do private(i,j,n,kk)
@@ -114,7 +121,8 @@ MODULE marker_data
 
         do n = 1 , nmark_elem(j,i)
           kk = mark_id_elem(n,j,i)
-          mark_phase(kk) = iph
+          ! explicit narrowing: mark_phase is 1 byte, iph is default integer
+          mark_phase(kk) = int(iph, 1)
         enddo
 
         iphase(j,i) = iph

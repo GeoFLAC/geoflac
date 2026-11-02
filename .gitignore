@@ -13,6 +13,9 @@ util/__pycache__
 # results created by flac under examples/
 examples/**
 !examples/*.inp
+!examples/tutorial*/
+!examples/tutorial*/*.inp
+!examples/tutorial*/*.md
 benchmark/**
 !benchmark/*.inp
 !benchmark/*.py
@@ -28,4 +31,7 @@ benchmark/**
 src/*.gcda
 src/*.gcno
 src/*.gcov
+
+# code env
+*.code-workspace
 

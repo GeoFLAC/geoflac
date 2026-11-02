@@ -45,7 +45,8 @@ Examine the `src/read_params.f90` section of the diff:
 
 ### 3. Check the Magma / Melting parameters block
 Find the melting lines inside `src/read_params.f90` in the diff:
-* **Has `nelem_dike`:** If the line has `itype_melting, nelem_serp, nelem_dike, prod_magma, rho_magma` (5 values), the date is **on or after 2026-05-27**.
+* **Has `prod_magma2`:** If the line has `itype_melting, nelem_serp, nelem_dike, prod_magma, prod_magma2, rho_magma` (6 values), the date is **on or after 2026-07-30**.
+* **Has `nelem_dike` but NOT `prod_magma2`:** If the line has `itype_melting, nelem_serp, nelem_dike, prod_magma, rho_magma` (5 values), the date is **between 2026-05-27 and 2026-07-30**.
 * **Has `rho_magma` but NOT `nelem_dike`:** If it reads `itype_melting, nelem_serp, prod_magma, rho_magma` (4 values), the date is **between 2023-02-01 and 2026-05-27**.
 * **Has `prod_magma` but NOT `rho_magma`:** If it reads `itype_melting, nelem_serp, prod_magma` (3 values), the date is **between 2021-08-10 and 2023-02-01**.
 * **Has `arc_extrusion_rate`:** The date is **before 2021-08-10**.
@@ -71,3 +72,4 @@ Once you match the structural changes, select a date within the identified epoch
 * **2023-02-04**: `angle_mzone` renamed and simplified.
 * **2025-10-17**: Added `extra_pres` and rheology `vactiv` parameter.
 * **2026-05-27**: Added crustal dike width `nelem_dike`.
+* **2026-07-30**: Added hydrous-mantle magma migration rate `prod_magma2`.

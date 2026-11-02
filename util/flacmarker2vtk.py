@@ -1,6 +1,11 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 '''Convert the binary marker output of flac to VTK (vtp) files.
+
+Thermochronology age conventions:
+  - NaN: Unreset system (the marker was never heated above its closure temperature Tc to reset its clock).
+  - -1.0: Unclosed / open system (the marker was reset, but is currently hotter than Tc).
+  - >= 0.0: Closed system cooling age in Myr (time elapsed since cooling below Tc).
 '''
 
 from __future__ import print_function

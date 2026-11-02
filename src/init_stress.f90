@@ -10,7 +10,7 @@ implicit none
 
 double precision, parameter :: pi = 3.14159265358979323846d0
 double precision, parameter :: degrad = pi/180
-integer n, i, j, ii, iph
+integer :: n, i, j, ii, iph, u
 double precision :: tmpr, densT, dh1, dh2, dh, dPT, dP, press, rogh
 
 n = 0
@@ -51,9 +51,9 @@ do i = 1,nx-1
 end do
 
 
-open(1,file='pisos.rs')
-write(1,*) pisos
-close (1)
+open(newunit=u, file='pisos.rs')
+write(u,*) pisos
+close (u)
 !$ACC update device(pisos) async(1)
 
 return

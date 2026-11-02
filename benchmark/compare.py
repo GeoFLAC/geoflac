@@ -82,13 +82,10 @@ new = 0
 
 try:
     # read old and new results
-
-    os.chdir(olddir)
-    flo = flac.Flac()
+    flo = flac.Flac(wdir=olddir)
     old = read_data(flo, frame)
 
-    os.chdir(newdir)
-    fln = flac.Flac()
+    fln = flac.Flac(wdir=newdir)
     new = read_data(fln, frame)
 
     # compare results
@@ -98,5 +95,4 @@ try:
     compare(old, new)
 
 finally:
-    # restort to original directory
-    os.chdir(curdir)
+    pass

@@ -9,9 +9,11 @@
 ##
 ## debug = 0: optimized build; 1: debugging build
 ## omp = 1: enable openmp support
-## acc = 1: enable openacc support (requiring PGI compiler)
+## acc = 1: enable openacc support (requiring PGI/NVIDIA compiler)
 ## coverage = 1: enable code coverage analysis (used for debugging)
 ## gprof = 1: enable profiling (used for tuning optimization)
+## nprof = 1: enable NVTX profiling ranges for NVIDIA Nsight (forces nvfortran;
+##            also requires cuda_path, e.g. make acc=1 nprof=1 cuda_path=/path/to/cuda)
 
 
 ########################################################################
@@ -19,16 +21,17 @@
 ########################################################################
 
 ## GNU version >= 5, otherwise openmp and ieee_is_nan won't work
-F90 = gfortran
+F90 ?= gfortran
+FC = $(F90)
 
-## Intel, tested with v11.1
-#F90 = ifort
+## Intel (ifort or modern ifx)
+#FC = ifx
 
-## PGI group, tested with 2017, 2019, 2021
-#F90 = pgf90
+## NVIDIA HPC SDK / PGI (nvfortran or pgf90)
+#FC = nvfortran
 
 ## Sun
-#F90 = f90
+#FC = f90
 
 
 ########################################################################
@@ -46,6 +49,11 @@ omp = 1
 acc = 0
 coverage = 0
 gprof = 0
+nprof = 0
+## only used when nprof = 1: path to the CUDA toolkit providing libnvToolsExt
+## (e.g. $(NVHPC_ROOT)/Linux_x86_64/<version>/cuda). Must be set on the
+## command line; there is no portable default.
+cuda_path =
 
 
 ########################################################################
@@ -53,9 +61,15 @@ gprof = 0
 ## (Usually you won't need to modify anything below)
 ########################################################################
 
+ifeq ($(nprof), 1)
+	F90 := nvfortran
+	FC = $(F90)
+	CFLAGS += -DUSE_NVTX
+endif
+
 ## for GNU gfortran >= 5
-ifeq ($(F90), gfortran)
-	CFLAGS += -ffree-form -ffree-line-length-none
+ifeq ($(FC), gfortran)
+	CFLAGS += -ffree-form -ffree-line-length-none -cpp
 	ifeq ($(omp), 1)
 		CFLAGS += -fopenmp
 		LDFLAGS += -fopenmp
@@ -80,23 +94,29 @@ ifeq ($(F90), gfortran)
 	endif
 endif
 
-## for Intel v11.1
-ifeq ($(F90), ifort)
+## for Intel (ifort or ifx)
+ifneq ($(filter ifort ifx,$(FC)),)
 	CFLAGS += -assume byterecl
 	ifeq ($(omp), 1)
-		CFLAGS += -fopenmp
-		LDFLAGS += -fopenmp
+		ifeq ($(FC), ifx)
+			CFLAGS += -qopenmp
+			LDFLAGS += -qopenmp
+		else
+			CFLAGS += -fopenmp
+			LDFLAGS += -fopenmp
+		endif
 	endif
 	ifeq ($(debug), 0)
-		CFLAGS += -fast
+		CFLAGS += -O2
 	else
 	       CFLAGS += -O0 -no-opt-subscript-in-range -ftrapuv -check all -traceback
 	       LDFLAGS +=
 	endif
 endif
 
-## for PGI
-ifeq ($(F90), pgf90)
+## for PGI / NVIDIA HPC SDK (pgf90 or nvfortran)
+ifneq ($(filter pgf90 nvfortran,$(FC)),)
+	CFLAGS += -cpp
 	ifeq ($(omp), 1)
 		CFLAGS += -mp
 		LDFLAGS += -mp
@@ -111,10 +131,14 @@ ifeq ($(F90), pgf90)
                CFLAGS += -O0 -Mbounds -Mchkstk -traceback
                LDFLAGS +=
         endif
+	ifeq ($(nprof), 1)
+		CFLAGS += -I$(cuda_path)/include -L$(cuda_path)/lib64 -lnvToolsExt
+		LDFLAGS += -L$(cuda_path)/lib64 -Wl,-rpath,$(cuda_path)/lib64 -lnvToolsExt
+	endif
 endif
 
 ## for Solaris
-ifeq ($(F90), f90)
+ifeq ($(FC), f90)
 	ifeq ($(omp), 1)
 		CFLAGS += -xopenmp=parallel
 		LDFLAGS += -xopenmp
@@ -145,6 +169,10 @@ MODULE_SRCS = \
 	phases.f90 \
 	marker_data.f90
 
+ifeq ($(nprof), 1)
+	MODULE_SRCS += nvtx_mod.f90
+endif
+
 SRCS =	\
 	bar2euler.f90 \
 	bc_update.f90 \
@@ -155,7 +183,6 @@ SRCS =	\
 	fl_flexure.f90 \
 	fl_node.f90 \
 	fl_rheol.f90 \
-	fl_srate.f90 \
 	fl_therm.f90 \
 	flac.f90 \
 	functions.f90 \
@@ -210,22 +237,66 @@ endif
 all: $(EXE) take-snapshot
 
 $(EXE): $(MODULE_OBJS) $(OBJS) $(OBJS2)
-	$(F90) $(LDFLAGS) $(MODULE_OBJS) $(OBJS) $(OBJS2) -o $@
+	$(FC) $(LDFLAGS) $(MODULE_OBJS) $(OBJS) $(OBJS2) -o $@
 
-$(MODULE_OBJS): %.o : %.f90
-	$(F90) $(CFLAGS) -c $<
-
-$(OBJS): %.o : %.f90 $(MODULES)
-	$(F90) $(CFLAGS) -c $<
+%.o : %.f90
+	$(FC) $(CFLAGS) -c $<
 
 # these subroutine cannot be compiled with high optimization
-$(OBJS2): %.o : %.f90 $(MODULES)
-	$(F90) -O2 -c $<
+$(OBJS2): %.o : %.f90 $(MODULE_OBJS)
+	$(FC) -O2 -c $<
+
+########################################################################
+## fine-grained module dependencies
+########################################################################
+marker_data.o: params.o arrays.o myrandom_mod.o
+
+bar2euler.o: arrays.o params.o marker_data.o
+bc_update.o: arrays.o params.o
+change_phase.o: marker_data.o arrays.o params.o phases.o
+check_nan.o: arrays.o
+dt_mass.o: arrays.o params.o
+euler2bar.o: arrays.o params.o
+fl_flexure.o: arrays.o params.o
+fl_move.o: arrays.o params.o phases.o marker_data.o myrandom_mod.o
+fl_node.o: arrays.o params.o
+fl_rheol.o: arrays.o params.o
+fl_therm.o: arrays.o params.o
+flac.o: arrays.o params.o
+ifeq ($(nprof), 1)
+flac.o: nvtx_mod.o
+endif
+functions.o: arrays.o params.o
+init_areas.o: arrays.o params.o
+init_bc.o: arrays.o params.o
+init_cord.o: arrays.o params.o
+init_marker.o: arrays.o params.o marker_data.o myrandom_mod.o
+init_phase.o: arrays.o params.o
+init_stress.o: arrays.o params.o phases.o
+init_temp.o: arrays.o params.o
+init_visc.o: arrays.o params.o
+lpeuler2bar.o: marker_data.o arrays.o params.o
+marker2elem.o: arrays.o params.o marker_data.o
+matprops.o: arrays.o params.o phases.o
+outflac.o: arrays.o params.o
+outmarker.o: marker_data.o arrays.o params.o
+par.o: arrays.o params.o marker_data.o
+read_params.o: arrays.o params.o
+rem_cord.o: arrays.o params.o
+remesh.o: arrays.o
+rem_test.o: arrays.o params.o
+rh_elastic.o: arrays.o params.o
+rh_maxwell.o: arrays.o params.o
+rh_plastic.o: arrays.o params.o
+rmasses.o: arrays.o params.o
+rsflac.o: arrays.o params.o marker_data.o
+saveflac.o: arrays.o params.o marker_data.o
+setflac.o: arrays.o params.o
 
 take-snapshot:
 	@# snapshot of the code for building the executable
 	@echo Flags used to compile the code: > snapshot.diff
-	@echo '  ' F90=$(F90) debug=$(debug) openmp=$(omp) acc=$(acc) >> snapshot.diff
+	@echo '  ' FC=$(FC) debug=$(debug) openmp=$(omp) acc=$(acc) >> snapshot.diff
 	@echo '  ' CFLAGS=$(CFLAGS) >> snapshot.diff
 	@echo '  ' LDFLAGS=$(LDFLAGS) >> snapshot.diff
 	@echo '  ' PATH= "$(PATH)" >> snapshot.diff

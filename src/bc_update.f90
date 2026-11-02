@@ -8,8 +8,9 @@ subroutine bc_update
   !$ACC routine(Eff_dens) seq
   use arrays
   use params
-  include 'precision.inc'
-
+  implicit none
+  integer :: i, j, iph, ii1, ii2, jj1, jj2
+  double precision :: rogh, densT, dh1, dh2, dh, dPT, dP, press, dlx, dly, press_norm, s_normal, s_shear, Eff_dens
   ! -------------------------------------------------------------
   !      LEFT BOUNDARY
   !   Update for hydrostatic force (normal to the surface)

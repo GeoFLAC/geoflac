@@ -4,8 +4,12 @@ subroutine euler2bar(x,y,bar1,bar2,ntr,ii,jj,inc)
 
 use arrays
 use params
-include 'precision.inc'
-
+implicit none
+double precision, intent(in) :: x, y
+double precision, intent(out) :: bar1, bar2
+integer, intent(out) :: ntr, inc
+integer, intent(inout) :: ii, jj
+integer :: i, j, n1, n2, n3
 !character*200 msg
 
 ! find the triangle in which the marker belongs
@@ -99,10 +103,13 @@ subroutine check_inside(x,y,bar1,bar2,ntr,i,j,inc)
   !$ACC routine seq
   use arrays
   use params
-
-  include 'precision.inc'
-
-  dimension xxmpt(2,3)
+  implicit none
+  double precision, intent(in) :: x, y
+  double precision, intent(out) :: bar1, bar2
+  integer, intent(out) :: ntr, inc
+  integer, intent(in) :: i, j
+  integer :: k, ninters
+  double precision :: x1, x2, x3, y1, y2, y3, det, xxmpt(2,3)
 
 
   inc = 0

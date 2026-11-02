@@ -4,13 +4,13 @@
 subroutine fl_move
 use arrays
 use params
-include 'precision.inc'
-
+implicit none
 integer, parameter :: nd1(4) = (/1, 3, 1, 1/)
 integer, parameter :: nd2(4) = (/2, 2, 2, 4/)
 integer, parameter :: nd3(4) = (/3, 4, 4, 3/)
 double precision :: xcord(4), ycord(4), xvel(4), yvel(4)
-integer :: a, b, c, k
+integer :: a, b, c, k, i, j
+double precision :: det, dw12, s11, s22, s12
 
 
 ! Move Grid
@@ -108,20 +108,20 @@ do  i = 1,nx-1
         enddo
 
         if (any(area(j,i,:) <= 0)) then
-            ! write(333, *) 'area', j, i, nloop
-            ! write(333, *) area(j,i,:)
-            ! write(333, *) 'cord:'
-            ! write(333, *) cord(j  ,i  ,:)
-            ! write(333, *) cord(j  ,i+1,:)
-            ! write(333, *) cord(j+1,i  ,:)
-            ! write(333, *) cord(j+1,i+1,:)
-            ! write(333, *) 'vel:'
-            ! write(333, *) vel(j  ,i  ,:)
-            ! write(333, *) vel(j  ,i+1,:)
-            ! write(333, *) vel(j+1,i  ,:)
-            ! write(333, *) vel(j+1,i+1,:)
-            ! flush(333)
-            ! call SysMsg('Negative area!')
+            write(333, *) 'area', j, i, nloop
+            write(333, *) area(j,i,:)
+            write(333, *) 'cord:'
+            write(333, *) cord(j  ,i  ,:)
+            write(333, *) cord(j  ,i+1,:)
+            write(333, *) cord(j+1,i  ,:)
+            write(333, *) cord(j+1,i+1,:)
+            write(333, *) 'vel:'
+            write(333, *) vel(j  ,i  ,:)
+            write(333, *) vel(j  ,i+1,:)
+            write(333, *) vel(j+1,i  ,:)
+            write(333, *) vel(j+1,i+1,:)
+            flush(333)
+            call SysMsg('Negative area!')
             stop 40
         endif
     enddo
@@ -136,11 +136,15 @@ end subroutine fl_move
 ! Diffuse topography
 !============================================================
 subroutine diff_topo
+!$ACC routine(newphase2marker) worker
+use marker_data
 use arrays
 use params
 use phases
-include 'precision.inc'
-
+implicit none
+integer :: i, j, iph, j_oc
+double precision :: topomean, snder, quad_area, totalmelt, arc_extrusion_rate
+double precision :: total_melt, extrusion_height, ele_height, quotient, remainder, delta_fmagma2
 !EROSION PROCESSES
 if( topo_kappa .gt. 0.d0 ) then
 
@@ -170,6 +174,11 @@ if( topo_kappa .gt. 0.d0 ) then
         snder = ( stmpn(i+1)*(cord(1,i+1,2)-cord(1,i  ,2))/(cord(1,i+1,1)-cord(1,i  ,1)) - &
             stmpn(i-1)*(cord(1,i  ,2)-cord(1,i-1,2))/(cord(1,i  ,1)-cord(1,i-1,1)) ) / &
             (cord(1,i+1,1)-cord(1,i-1,1))
+        if (snder < 0) then
+            ! scale erosion rate by the relative erodibility of the surface phase
+            iph = iphase(1,i)
+            snder = snder * erodibility(iph)
+        endif
         dtopo(i) = dt * snder
     end do
 
@@ -184,9 +193,14 @@ if( topo_kappa .gt. 0.d0 ) then
         dtopo(i) = min(dtopo(i), 0.5*(cord(1,i,2)-cord(2,i,2)))
     enddo
 
-    ! accumulated topo change since last resurface
+    ! accumulated non-tectonic topo change per surface node for marker topographic correction
     !$ACC wait(1)
     !$ACC parallel loop async(2)
+    do i = 1, nx
+        dhacc_correction(i) = dhacc_correction(i) + dtopo(i)
+    enddo
+
+    ! accumulated non-tectonic topo change per surface element for resurfacing
     do i = 1, nx-1
         dhacc(i) = dhacc(i) + 0.5d0 * (dtopo(i) + dtopo(i + 1))
     enddo
@@ -198,7 +212,7 @@ if( topo_kappa .gt. 0.d0 ) then
 endif
 
 ! magma extrusion
-arc_extrusion_rate = 1.d0 - ratio_mantle_mzone
+arc_extrusion_rate = 1.d0 - ratio_mantle_mzone - ratio_crust_mzone
 if (arc_extrusion_rate > 0) then
     !$ACC parallel loop async(1)
     do i = 2, nx-2  ! avoid edge elements, which should not contain arc magma
@@ -215,11 +229,77 @@ if (arc_extrusion_rate > 0) then
         !print *, i, extrusion(i), totalmelt
         extr_acc(i) = extr_acc(i) + extrusion(i)
         !$ACC atomic update
+        dhacc_correction(i) = dhacc_correction(i) + extrusion(i)
+        !$ACC atomic update
+        dhacc_correction(i+1) = dhacc_correction(i+1) + extrusion(i)
+        !$ACC atomic update
+        dhacc(i) = dhacc(i) + extrusion(i)
+        !$ACC atomic update
         cord(1,i,2) = cord(1,i,2) + extrusion(i)
         !$ACC atomic update
         cord(1,i+1,2) = cord(1,i+1,2) + extrusion(i)
     enddo
 endif
+
+! MOR test
+! New oceanic crust construction from the second (hydrous-mantle-melt) magma
+! pool fmagma2, analogous to the arc-extrusion block above but for a
+! mid-ocean-ridge-style setting.
+!$ACC parallel loop async(1)
+do i = 2, nx-2
+    ! volume of magma-2 currently stored in this column (area-weighted),
+    ! depleting the fraction extruded this timestep from the source
+    ! reservoir (mirrors how fl_therm.f90 subtracts delta_fmagma2 when
+    ! fmagma2 freezes instead of erupting)
+    total_melt = 0
+    !$ACC loop reduction(+:total_melt)
+    do j = 1, nz-1
+        quad_area = 0.5d0/area(j,i,1) + 0.5d0/area(j,i,2)
+        total_melt = total_melt + quad_area * fmagma2(j,i)
+        delta_fmagma2 = min(fmagma2(j,i), fmagma2(j,i) * prod_magma2 * dt)
+        fmagma2(j,i) = fmagma2(j,i) - delta_fmagma2
+    enddo
+    ! height of new crust this column's magma-2 would form if extruded
+    ! onto the surface this timestep
+    extrusion_height = dt * total_melt * prod_magma2 / (cord(1,i+1,1) - cord(1,i,1))
+
+    ! Walk down from the surface, accumulating element thicknesses into
+    ! ele_height, until it exceeds half of extrusion_height. j_oc is the
+    ! row where that happens: roughly how many rows of new crust the
+    ! extruded magma volume is equivalent to. quotient and remainder are
+    ! left as computed at that row and reused below. j_oc defaults to 1
+    ! in case the loop never satisfies the exit condition.
+    ele_height = 0
+    j_oc = 1
+    do j = 1, nz-1
+        ele_height = ele_height + abs(0.5d0 * (cord(j+1,i+1,2)+cord(j+1,i,2)) - 0.5d0 * (cord(j,i+1,2)+cord(j,i,2)))
+        quotient = extrusion_height / ele_height
+        remainder = mod(extrusion_height, ele_height)
+        if (quotient >= 0.d0 .and. quotient < 2.d0) then
+            j_oc = j
+            exit
+        endif
+    enddo
+
+    ! If there's enough accumulated magma-2 (quotient >= 1, i.e.
+    ! ele_height <= extrusion_height), relabel the top j_oc rows below the
+    ! first non-oceanic-crust element as freshly-formed oceanic crust.
+    do j = 1, nz-1
+        iph = iphase(j,i)
+        if (iph /= kocean1 .and. quotient >= 1) then
+            call newphase2marker(j,min(nz-1,j+j_oc-1),i,i,kocean1)
+            exit
+        endif
+    enddo
+
+    ! Whatever extrusion height wasn't converted into a full row (remainder)
+    ! is added directly to the two surface nodes bounding this column.
+    extr_acc(i) = extr_acc(i) + remainder/2
+    !$ACC atomic update
+    cord(1,i,2) = cord(1,i,2) + remainder/2
+    !$ACC atomic update
+    cord(1,i+1,2) = cord(1,i+1,2) + remainder/2
+enddo
 
 ! adjust markers
 if (topo_kappa > 0 .or. arc_extrusion_rate > 0) then
@@ -245,13 +325,14 @@ subroutine resurface
   use arrays
   use params
   use phases
-  include 'precision.inc'
-
+  implicit none
+  integer :: i, j, k, m, n, ii, jj, kk, i1, i2, i3, j1, j2, j3, kinc, ichanged, kmax, nmax, ntriag, n_to_add
+  double precision :: elz, chgtopo, chgtopo2, dz_ratio, ymax, y, ba1, ba2, ba3
   !$ACC serial private(dz_ratio) async(1)
   do i = 1, nx-1
       ! averge thickness of this element
       elz = 0.5d0 * (cord(1,i,2) - cord(2,i,2) + cord(1,i+1,2) - cord(2,i+1,2))
-      ! change in topo
+      ! change in topo over this element
       chgtopo = dhacc(i)
       ! # of markers in this element
       kinc = nmark_elem(1,i)
@@ -266,7 +347,7 @@ subroutine resurface
                 n = mark_id_elem(k, 1, i)
                 ntriag = mark_ntriag(n)
                 ! get physical coordinate (x, y) of marker n
-                m = mark_ntriag(i)
+                m = ntriag
                 kk = mod(m-1, 2) + 1
                 jj = mod((m - kk) / 2, nz-1) + 1
                 ii = (m - kk) / 2 / (nz - 1) + 1
@@ -306,7 +387,7 @@ subroutine resurface
                 nmark_elem(1, i) = nmark_elem(1, i) - 1
             endif
 
-            dhacc(i) = 0
+            dhacc(i) = 0.d0
             ichanged = 1
       endif
 
@@ -315,7 +396,7 @@ subroutine resurface
             !write(6,*) 'sediment', i, chgtopo, elz
             call add_marker_at_top(i, 0.1d0, time, nloop, ksed1)
 
-            dhacc(i) = 0
+            dhacc(i) = 0.d0
             ichanged = 1
       endif
 
@@ -327,16 +408,16 @@ subroutine resurface
             dz_ratio = min(chgtopo2 / elz, 1.0d0)
             !write(6,*) 'arc', i, chgtopo2, elz, n_to_add, dz_ratio
             do ii = 1, n_to_add
-                call add_marker_at_top(i, dz_ratio, time, nloop+i+ii, karc1)
+                call add_marker_at_top(i, dz_ratio, time, nloop+i+ii, kocean1)
             enddo
 
             extr_acc(i) = 0
             ichanged = 1
       endif
-
+      
       if (ichanged == 1) then
             ! recalculate phase ratio
-            call count_phase_ratio(1,i)
+            call count_phase_ratio(1,i) 
       endif
   end do
   !$ACC end serial
@@ -351,8 +432,11 @@ subroutine add_marker_at_top(i, dz_ratio, time, loop, kph)
   use myrandom_mod
   use marker_data
   use arrays
-  include 'precision.inc'
-
+  implicit none
+  integer, intent(in) :: i, loop, kph
+  double precision, intent(in) :: dz_ratio, time
+  integer :: j, iseed, icount, inc
+  double precision :: r1, r2, x1, y1, x2, y2, xx, yy
   iseed = loop + i
   icount = 0
   do while(.true.)

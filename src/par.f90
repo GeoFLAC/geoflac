@@ -8,8 +8,9 @@ use marker_data
 
 character*200 inputfile
 real*4 secnds,time0
-integer :: narg, iargc, j, irestart
+integer :: narg, iargc, j, irestart, u_out
 double precision :: dtacc_file, dtacc_save, dtacc_screen
+logical :: file_exists
 
 narg = iargc()
 if(narg /= 1) then
@@ -18,7 +19,12 @@ if(narg /= 1) then
 endif
 call getarg(1, inputfile)
 
-open( 333, file='output.asc' )
+! unit 333 is also written to directly (without an open) from
+! rem_test.f90, init_marker.f90, and fl_move.f90; connecting it here
+! to output.asc means those writes land there too, instead of the
+! default fort.333 fallback.
+u_out = 333
+open( unit=u_out, file='output.asc' )
 
 time0 = secnds(0.0)
 
@@ -28,15 +34,12 @@ call allocate_arrays(nz, nx, nphase)
 call allocate_markers(nz, nx)
 
 ! Try to read save-file contents. If file exist - restart, othewise - new start
-open(1,file='_contents.rs',status='old',err=10)
-
-irestart = 1
-close(1)
-goto 20
-
-10 irestart = 0
-
-20 continue
+inquire(file='_contents.rs', exist=file_exists)
+if (file_exists) then
+    irestart = 1
+else
+    irestart = 0
+endif
 
 if ( irestart .eq. 1 ) then  !file exists - restart
     call rsflac
@@ -48,7 +51,7 @@ if ( irestart .eq. 1 ) then  !file exists - restart
 else ! file does not exist - new start
     if( dtout_screen .ne. 0 ) then
         write(6,*) 'you have NEW start conditions'
-        write(333,*) 'you have NEW start conditions'
+        write(u_out,*) 'you have NEW start conditions'
     else
         call SysMsg('you have NEW start conditions')
     endif
@@ -69,7 +72,7 @@ do while( time .le. time_max )
     if( dtacc_screen .gt. dtout_screen ) then
        write(*,'(I10,A,F7.3,A,F8.1,A)') nloop,'''s step. Time[My]=', time/sec_year/1.d+6, &
                 ',  elapsed sec-', secnds(time0)
-       write(333,'(I10,A,F7.3,A,F8.1,A)') nloop,'''s step. Time[My]=', time/sec_year/1.d+6, &
+       write(u_out,'(I10,A,F7.3,A,F8.1,A)') nloop,'''s step. Time[My]=', time/sec_year/1.d+6, &
                 ',  elapsed sec-', secnds(time0)
        dtacc_screen = 0
     endif
@@ -100,6 +103,9 @@ do while( time .le. time_max )
       call marker2elem
       !$ACC end parallel
       !$ACC update self(nmarkers) async(1)
+      !$ACC kernels async(1)
+      dhacc_correction(:) = 0.d0
+      !$ACC end kernels
     endif
   endif
 
@@ -125,7 +131,7 @@ end do
 ! SAVING the restart information of last step
 call saveflac
 
-close(333)
+close(u_out)
 
 call SysMsg('Congratulations !')
 end program DREZINA

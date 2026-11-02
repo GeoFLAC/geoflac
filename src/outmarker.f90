@@ -2,15 +2,19 @@ subroutine outmarker
 USE marker_data
 use arrays
 use params
-
-include 'precision.inc'
-parameter( kindr=4, kindi=4 )
-real(kindr) D1d(nmarkers)
-integer(kindi) D1i(nmarkers)
+implicit none
+integer, parameter :: kindr=4, kindi=4
+integer :: i, l, nrec, nwords
+real(kindr) :: D1d(nmarkers)
+integer(kindi) :: D1i(nmarkers)
+double precision :: xtmp(nmarkers), ytmp(nmarkers)
 
 character*100 fn
 
-call bar2euler
+! mark_a1/mark_a2 are still needed below (as the true barycentric
+! coordinates), so get Euler coordinates into a local buffer instead of
+! letting bar2euler overwrite them in place.
+call bar2euler_xy(xtmp, ytmp)
 !$ACC wait
 
 nrec = 0
@@ -43,12 +47,12 @@ write(fn,'(A,I6.6,A)') 'marker1.', nrec, '.0'
 open (1,file=fn,access='direct',recl=nwords*kindr)
 
 do i = 1, nmarkers
-    D1d(i)= real(mark_x(i) * 1d-3)
+    D1d(i)= real(xtmp(i) * 1d-3)
 enddo
 write (1,rec=1) D1d
 
 do i = 1,nmarkers
-    D1d(i)= real(mark_y(i) * 1d-3)
+    D1d(i)= real(ytmp(i) * 1d-3)
 enddo
 write (1,rec=2) D1d
 

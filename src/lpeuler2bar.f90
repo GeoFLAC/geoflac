@@ -3,10 +3,10 @@ subroutine lpeuler2bar
 USE marker_data
 use arrays
 use params
-
-include 'precision.inc'
-
+implicit none
 character*200 msg
+integer :: n, i, j, k, kk, ntr, inc
+double precision :: xx, yy, bar1, bar2
 
 !$ACC kernels async(1)
 mark_id_elem(:,:,:) = 0
@@ -23,8 +23,12 @@ do n = 1 , nmarkers
     j = mod((mark_ntriag(n) - k) / 2, nz-1) + 1
     i = (mark_ntriag(n) - k) / 2 / (nz - 1) + 1
 
-    xx = mark_x(n)
-    yy = mark_y(n)
+    ! bar2euler() (called just before this, with no output args) wrote the
+    ! marker's Euler coordinates into mark_a1/mark_a2 as scratch space,
+    ! since they're about to be overwritten below with the real new
+    ! barycentric coordinates anyway.
+    xx = mark_a1(n)
+    yy = mark_a2(n)
     call euler2bar(xx,yy,bar1,bar2,ntr,i,j,inc)
     if (inc.eq.0) then
         !write(*,*) i,j,ntr,xx,yy

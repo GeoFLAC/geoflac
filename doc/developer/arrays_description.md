@@ -248,25 +248,12 @@ This document describes the primary data arrays used in the `geoflac` Fortran en
 
 ---
 
-## `strainr`
-
-*   **Meaning:** Deviatoric strain rate components for each sub-triangle [1/s].
-*   **Shape:** `(3, 4, nz-1, nx-1)`
-*   **Dimension 1 (3):** Strain rate components (1: sr_xx, 2: sr_zz, 3: sr_xz).
-*   **Dimension 2 (4):** Sub-triangle index.
-*   **Dimension 3 (`nz-1`):** Vertical index (element).
-*   **Dimension 4 (`nx-1`):** Horizontal index (element).
-*   **Update Locations:**
-    *   **Main Update:** `src/fl_srate.f90` (calculated from nodal velocities and element geometry).
-
----
-
 ## `e2sr`
 
 *   **Meaning:** Second invariant of the deviatoric strain rate, averaged over time [1/s].
 *   **Shape:** `(nz-1, nx-1)`
 *   **Update Locations:**
-    *   **Main Update:** `src/fl_srate.f90` (averaged over `ifreq_avgsr` time steps).
+    *   **Main Update:** `src/fl_rheol.f90` (averaged over `ifreq_avgsr` time steps).
 
 ---
 
@@ -281,8 +268,8 @@ This document describes the primary data arrays used in the `geoflac` Fortran en
     *   `2`: Integrated vertical normal strain rate $\int \dot{\epsilon}_{zz} \, dt$
     *   `3`: Integrated shear strain rate $\int \dot{\epsilon}_{xz} \, dt$
 *   **Update Locations:**
-    *   **Main Accumulation:** `src/fl_srate.f90` (adds the current step's strain increment: `se2sr = se2sr + strainr * dt`).
-    *   **Averaging & Reset:** `src/fl_srate.f90` computes the second invariant of strain rate `e2sr` at the end of the averaging interval (`dtavg`) using the accumulated components in `se2sr`, then resets `se2sr` to `0.d0` (or initialized to `1d-16` in `setflac.f90`).
+    *   **Main Accumulation:** `src/fl_rheol.f90` (adds the current step's strain increment: `se2sr = se2sr + sr_loc * dt`).
+    *   **Averaging & Reset:** `src/fl_rheol.f90` computes the second invariant of strain rate `e2sr` at the end of the averaging interval (`dtavg`) using the accumulated components in `se2sr`, then resets `se2sr` to `0.d0` (or initialized to `1d-16` in `setflac.f90`).
 
 ---
 
@@ -313,7 +300,7 @@ This document describes the primary data arrays used in the `geoflac` Fortran en
 *   **Meaning:** Shear heating (viscous dissipation) term, averaged over time.
 *   **Shape:** `(nz-1, nx-1)`
 *   **Update Locations:**
-    *   **Main Update:** `src/fl_srate.f90` (calculated as $\sigma_{ij} \dot{\epsilon}_{ij}$ and averaged over `ifreq_avgsr` time steps).
+    *   **Main Update:** `src/fl_rheol.f90` (calculated as $\sigma_{ij} \dot{\epsilon}_{ij}$ and averaged over `ifreq_avgsr` time steps).
 
 ---
 
@@ -324,8 +311,8 @@ This document describes the primary data arrays used in the `geoflac` Fortran en
 *   **Dimension 1 (`nz-1`):** Vertical index (element).
 *   **Dimension 2 (`nx-1`):** Horizontal index (element).
 *   **Update Locations:**
-    *   **Main Accumulation:** `src/fl_srate.f90` (adds viscous dissipation power density: `sshrheat = sshrheat + shear_heating * dt`).
-    *   **Averaging & Reset:** `src/fl_srate.f90` computes the time-averaged shear heating `shrheat` at the end of the averaging interval as `sshrheat / dtavg`, then resets `sshrheat` to `0.d0`.
+    *   **Main Accumulation:** `src/fl_rheol.f90` (adds viscous dissipation power density: `sshrheat = sshrheat + shear_heating * dt`).
+    *   **Averaging & Reset:** `src/fl_rheol.f90` computes the time-averaged shear heating `shrheat` at the end of the averaging interval as `sshrheat / dtavg`, then resets `sshrheat` to `0.d0`.
 
 ---
 
@@ -341,12 +328,23 @@ This document describes the primary data arrays used in the `geoflac` Fortran en
 
 ## `dhacc`
 
-*   **Meaning:** Accumulated change in topography (elevation change) for each element at the surface.
+*   **Meaning:** Accumulated non-tectonic surface elevation change ($\Delta h$) for each surface element since the last marker resurfacing (addition/deletion) [m]. Saved in `dhacc.rs`.
 *   **Shape:** `(nx-1)`
 *   **Dimension 1 (`nx-1`):** Horizontal index (element).
 *   **Update Locations:**
-    *   **Main Update:** `src/fl_move.f90` (accumulates the average `dtopo` of the two nodes defining the element top).
-    *   **Reset:** `src/fl_move.f90` resets to zero after remeshing or if it exceeds certain criteria.
+    *   **Main Accumulation:** `src/fl_move.f90` (accumulates element-averaged `dtopo` and `extrusion`).
+    *   **Marker Addition/Deletion & Reset:** `src/fl_move.f90` (`resurface` adds/deletes markers when `dhacc(i)` exceeds threshold and resets `dhacc(i) = 0.d0`).
+
+---
+
+## `dhacc_correction`
+
+*   **Meaning:** Accumulated non-tectonic surface elevation displacement ($\Delta h$) at each surface node since the last remeshing (from erosion, sedimentation, and volcanic extrusion) [m]. Saved in `dhacc_corr.rs`.
+*   **Shape:** `(nx)`
+*   **Dimension 1 (`nx`):** Horizontal index (node).
+*   **Update Locations:**
+    *   **Main Accumulation:** `src/fl_move.f90` (accumulates nodal `dtopo` and `extrusion`).
+    *   **Reset After Remeshing:** `src/remesh.f90` (resets `dhacc_correction(:) = 0.d0` after remeshing and marker re-mapping complete).
 
 ---
 
@@ -552,6 +550,7 @@ This document describes the primary data arrays used in the `geoflac` Fortran en
 ## `mark_phase`
 
 *   **Meaning:** Material phase ID assigned to each marker.
+*   **Type:** `integer(1)` (signed 1 byte). Phase IDs must stay within 1..127, so `maxph` (`src/params.f90`) cannot exceed 127.
 *   **Shape:** `(max_markers)`
 *   **Dimension 1:** Total marker index.
 *   **Update Locations:**
@@ -573,6 +572,7 @@ This document describes the primary data arrays used in the `geoflac` Fortran en
 ## `mark_dead`
 
 *   **Meaning:** Status flag for marker activity.
+*   **Type:** `integer(1)` (signed 1 byte).
 *   **Value:** `1` for active, `0` for dead/inactive.
 *   **Shape:** `(max_markers)`
 *   **Update Locations:**
@@ -583,19 +583,11 @@ This document describes the primary data arrays used in the `geoflac` Fortran en
 
 ## `mark_ntriag`
 
-*   **Meaning:** Index of the sub-triangle within an element where the marker is currently located.
+*   **Meaning:** Global flattened triangle index identifying which sub-triangle of which element currently contains the marker: `2*(nx-1)*(nz-1)` possible values, decoded as `k = mod(n-1,2)+1` (sub-triangle 1 or 2), `j = mod((n-k)/2, nz-1)+1` (element row), `i = (n-k)/2/(nz-1)+1` (element column). See e.g. `src/change_phase.f90` or `src/lpeuler2bar.f90` for the decode.
+*   **Type:** Default `integer` (4 bytes). Kept full width deliberately -- its range scales with mesh size and can exceed 127 (or even 32767) on realistic meshes, so it cannot be narrowed the way `mark_dead`/`mark_phase` were.
 *   **Shape:** `(max_markers)`
 *   **Update Locations:**
     *   **Main Update:** `src/marker2elem.f90` (re-calculated during the search process to find which element/triangle contains the marker).
-
----
-
-## `mark_ID`
-
-*   **Meaning:** Unique identification number for each marker.
-*   **Shape:** `(max_markers)`
-*   **Update Locations:**
-    *   **Assignment:** `src/marker_data.f90` (typically assigned once during creation in `add_marker`).
 
 ---
 

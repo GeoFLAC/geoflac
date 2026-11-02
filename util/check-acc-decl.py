@@ -1,7 +1,38 @@
 #!/usr/bin/python3
-# Compare variable declaration in 'params.f90' with clauses
-# '!$ACC declare' in 'params.f90' and '!$ACC update' in 'setflac.f90'
-# Usage: Run this script under src/ directory.
+# ==============================================================================
+# OpenACC Variable Declaration Consistency Checker
+# ==============================================================================
+# Purpose:
+#   Verifies that global variable declarations in 'params.f90' match exactly
+#   with OpenACC directives:
+#     1. '!$ACC declare create' in 'params.f90'
+#     2. '!$ACC update device' in 'setflac.f90'
+#
+# Usage:
+#   Run this script from the 'src/' directory:
+#     python3 ../util/check-acc-decl.py
+#
+# Parsing Requirements & Constraints:
+#   - Identical Line-by-Line Layout: The script parses lines verbatim. All three
+#     locations must group variables on the same lines in the same order.
+#   - No Inline Comments: Comments (lines starting with '!') must not be inserted
+#     in the middle of multi-line declarations/directives as it halts parsing loops.
+#   - Line Continuation: All continuation lines in directives must end with '&'.
+#   - Final Parenthesis Constraint: Array variables (e.g., 'dumC(4)') should not
+#     be placed at the very end of a block/clause because the parser strips
+#     closing parentheses differently for F90 vs. ACC directives. Always place
+#     a scalar variable (e.g., 'xmodalcpx') at the end of the lists.
+#
+# Output:
+#   - '# of lines: A B C': Counts of parsed declaration, declare, and update lines.
+#   - 'Line X mismatch in acc create/update': Identifies mismatching lines.
+#
+# How to Resolve Mismatches:
+#   1. Align variables in 'params.f90' declarations, 'params.f90' ACC declare,
+#      and 'setflac.f90' ACC update device blocks.
+#   2. Match line breaks and variable ordering exactly.
+#   3. Ensure continuation '&' is present at the end of every non-final line.
+# ==============================================================================
 
 decli, decld, accdecl, accupd = [], [], [], []
 acc_hdr = '!$ACC '

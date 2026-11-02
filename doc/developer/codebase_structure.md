@@ -44,16 +44,18 @@ graph TD
 GeoFLAC uses a classic Unix `make` build system managed by the Makefile in `src/Makefile`.
 
 ### A. Compiler Flag Configurations
-The default compiler is **`gfortran`** (GNU Fortran). Key flags configured in the Makefile:
-*   **`-O3`**: High-level compiler optimizations.
+The default compiler variable is **`FC`** (defaulting to `gfortran`, with `F90` supported for backward compatibility). Supported compiler suites include `gfortran`, Intel oneAPI `ifx` (`ifort`), and NVIDIA HPC SDK `nvfortran` (`pgf90`).
+
+Key flags configured in the Makefile:
+*   **`-O2`**: Standard high-level compiler optimizations (default for `debug=0`).
 *   **`-ffree-form`**: Compiles source code in free-form syntax (`.f90` files).
 *   **`-ffree-line-length-none`**: Prevents compilation errors due to warnings about lines exceeding the standard 132-character limit.
-*   **`-fopenmp`**: Enables multi-threaded CPU parallelization.
+*   **`-fopenmp`**: Enables multi-threaded CPU parallelization (enabled with `omp=1`).
 
 To build the executable:
 ```bash
 cd src/
-make
+make FC=gfortran omp=1
 ```
 This produces the binary executable `flac` in the `src/` directory.
 

@@ -24,8 +24,9 @@ The GeoFLAC repository is structured as follows:
 2. Build the optimized parallel binary with your Fortran compiler (e.g., `gfortran`):
    ```bash
    make clean
-   make F90=gfortran
+   make FC=gfortran omp=1
    ```
+   (Note: Both `FC=gfortran` and `F90=gfortran` are supported.)
    This will generate a compiled binary named `flac` in the `src/` directory.
 
 ---

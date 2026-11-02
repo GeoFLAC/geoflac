@@ -102,7 +102,7 @@
 | Parameters  | Types |  Description  |
 |:------------|:-----:|:--------------|
 |**i-prestress**| int | Let model equilibrate given initial state, by running model for 600 kyrs before any BC changes are allowed (0-no, 1-yes).  Temperature and stress will redistribute; topography, and mountain roots will isostatically adjust.|
-|**extra pressure**| dbl | extra pressure (GPa) to support Archimed force.|
+|**extra pressure**| dbl | extra pressure (Pa) to support Archimed force.|
 |**itherm**| int | 1-mechanical+thermal calculation, 2-no mechenical. NOTE: usually itherm=1.|
 |**istress-therm**| int | Add thermal stress (0-no, 1-yes). |
 |**ishearh**| int | Add shear heating.|
@@ -129,6 +129,7 @@
     + 12: continental geotherm (plate cooling model with radiogenic heating in the crust). **age-1** is the  thermal age (Myrs) of the plate. **tp1** is the plate thickness (km). **tp2** is the Moho depth (km). Radiogenic parameters **hs** and **hr** from above.
     + 21: constant geothermal gradient for the top layer, then constant **t-bot** to the bottom. **age-1** is the layer thickness (km).
     + 22: constant geothermal gradient for the top two layers, then constant **t-bot** to the bottom. **age-1** is the temperature at the layer interface, **tp1** is top layer thickness (km). **tp2** is the combined top 2 layers thickness (km).
+    + 13: continental geotherm (Hasterok & Chapman, 2011), integrating the steady-state 1-D heat equation layer by layer (upper crust, lower crust, mantle lithosphere), each with its own conductivity and radiogenic heat generation, clamped to **t-bot** once reached. **age-1** is the surface heat flow (mW/m2). **tp1** is the upper crust thickness (km). **tp2** is the lower crust thickness (km).
 * **nph-layer**: # (N) of layers in this zone (max 10)
     + **hc(1, 2, ..., N-1)**: depths of layer interfaces (km).
     + **iph-col(1, 2, ..., N-1, N)**: phase of each layer.
@@ -171,7 +172,7 @@ Phase changes are activated and will take place among certain of the defined pha
 | Parameters  | Types |  Description  |
 |:------------|:-----:|:--------------|
 |**nphase**| int | Number of different types of phases (materials), max. 20.|
-|**_irheol(i),visc(i), den(i), alfa(i),beta(i), pln(i),acoef(i),eactiv(i), vactiv(i), rl(i),rm(i), plstrain1(i),plstrain2(i), fric1(i),fric2(i), cohesion1(i),cohesion2(i), dilat1(i),dilat2(i), conduct(i),cp(i), ts(i),tl(i),tk(i),fk(i)_**| int, 24 dbl | See below.|
+|**_irheol(i),visc(i), den(i), alfa(i),beta(i), pln(i),acoef(i),eactiv(i), vactiv(i), rl(i),rm(i), plstrain1(i),plstrain2(i), fric1(i),fric2(i), cohesion1(i),cohesion2(i), dilat1(i),dilat2(i), conduct(i),cp(i), ts(i),tl(i),tk(i),erodibility(i)_**| int, 24 dbl | See below.|
 
 
 +  **irheol**: Rheology for this phase (see below).
@@ -209,7 +210,7 @@ Phase changes are activated and will take place among certain of the defined pha
 +  **ts**:  solidus temperature in Celsius, only used for the hydrated mantle phase.
 +  **tl**:  liquidus temperature in Celsius.
 +  **tk**:  latent heat of fusion temperature, not used.
-+  **fk**:  coeff of latent heat of fusion, not used.
++  **erodibility**: relative erodibility of this phase (dimensionless). Scales the surface erosion rate computed in `diff_topo` (`src/fl_move.f90`) wherever this phase sits at the surface; has no effect on deposition. A value of 1 leaves the erosion rate unscaled.
 
 
 ## INITIAL PHASE DISTRIBUTION
@@ -269,7 +270,7 @@ Phase changes are activated and will take place among certain of the defined pha
 | Parameters  | Types |  Description  |
 |:------------|:-----:|:--------------|
 |**itype-melting, nelem-serp, nelem-dike, prod-magma, rho-magma**|3 int, 2 dbl| See below.|
-|**angle-mzone, fmagma-max, ratio-mantle-mzone**|4 dbl| See below.|
+|**angle-mzone, fmagma-max, ratio-mantle-mzone, ratio-crust-mzone**|4 dbl| See below.|
 |**latent-heat-magma, lambda-freeze, lambda-freeze-tdep**|3 dbl| See below.|
 |**weaken-ratio-plastic, weaken-ratio-viscous**|2 dbl| See below.|
 
@@ -281,6 +282,7 @@ Phase changes are activated and will take place among certain of the defined pha
 * **angle-mzone**: angle (in degrees) of the magma zone in the mantle.
 * **fmagma-max**: max volume ratio of magma (dimensionless fraction).
 * **ratio-mantle-mzone**: ratio of magma staying in the mantle. It will affect how much magma resides in the mantle wedge, respectively.
+* **ratio-crust-mzone**: fraction of the arc melt (not staying in the mantle, i.e., not **ratio-mantle-mzone**) that intrudes into the crust as dikes, tracked element-by-element in **fmagma** and given a mechanical volume-expansion effect (rate-capped at 0.01% of the initial grid's minimum element area per timestep) once enough has migrated into a given crustal element. The remainder, `1 - ratio-mantle-mzone - ratio-crust-mzone`, erupts at the surface (the existing arc-extrusion mechanism). Sufficiently accumulated dike volume in an element also spawns new karc1 (arc crust) markers there.
 * **latent-heat-magma**: the latent heat of magma freezing in J/kg.
 * **lambda-freeze, lambda-freeze-tdep**: temperature-dependent decaying constant of magma (ie. freezing) M(dt)=M(0)*(1-lambda*dt), where lambda = **lambda-freeze** (in s^-1) x exp(-**lambda-freeze-tdep** x (T - **t_top**)). These will affect how long magma can remain in the mantle wedge. Additionally, more freezing will release more latent heat and increase the temperature in the mantle wedge.
 * **weaken-ratio-plastic, weaken-ratio-viscous**: Magma induced weakening for yield stress (plastic) and viscosity. Saturated at **fmagma-max**.
@@ -339,11 +341,11 @@ Phase changes are activated and will take place among certain of the defined pha
 * **io-srII**  Deviatoric strain rate - second invariant, log10().  srII.0
 * **io-eII**  Dev. strain - second invariant, first invariant.        eII.0, eI.0
 * **io-aps** Total accumulated plastic strain    aps.0
-* **io-sII**  Dev. stress - sqrt(second invariant), in kbars  sII.0
-* **io-sxx** Dev. stress – xx component, in kbars   sxx.0
-* **io-szz**  Dev. stress – zz component, in kbars   szz.0
-* **io-sxz** Stress - xz (shear) component,  in kbars   sxz.0
-* **io-pres** Pressure, in kbars       pres.0
+* **io-sII**  Dev. stress - sqrt(second invariant), in Pa  sII.0
+* **io-sxx** Dev. stress – xx component, in Pa   sxx.0
+* **io-szz**  Dev. stress – zz component, in Pa   szz.0
+* **io-sxz** Stress - xz (shear) component,  in Pa   sxz.0, syy.0
+* **io-pres** Pressure, in Pa       pres.0
 * **io-temp** Temperatur, in Celsius      temp.0
 * **io-phase** Phase # (1-n as defined in input file).   phase.0
 * **io-visc** Viscosity, log10(Pa-s)      visc.0

@@ -10,6 +10,8 @@ except ImportError:
     print('Please install the module and add it to PYTHONPATH environment variable.')
     sys.exit(1)
 
+
+
 try:
     # for interpolation
     from scipy import interpolate
@@ -33,15 +35,19 @@ class Flac(object):
     '''Read Flac data file. Most data are 2D arrays with shape (nx, nz) or (nex, nez).
     '''
 
-    def __init__(self, swap_endian=False):
+    def _open(self, filename, mode='r'):
+        return open(os.path.join(self.wdir, filename), mode)
+
+    def __init__(self, swap_endian=False, wdir='.'):
         self.swap_endian = swap_endian
+        self.wdir = wdir
         self.reload()
         return
 
 
     def reload(self):
         # read record number
-        tmp = np.fromfile('_contents.0', sep=' ')
+        tmp = np.fromfile(os.path.join(self.wdir, '_contents.0'), sep=' ')
         tmp.shape = (-1, 3)
         self.frames = tmp[:,0].astype(int)
         self.steps = tmp[:,1].astype(int)
@@ -49,7 +55,7 @@ class Flac(object):
         self.nrec = len(self.time)
 
         # number of elements in x and z
-        nex, nez = np.fromfile('nxnz.0', sep=' ', dtype=int)
+        nex, nez = np.fromfile(os.path.join(self.wdir, 'nxnz.0'), sep=' ', dtype=int)
         # number of nodes in x and z
         self.nx, self.nz = nex+1, nez+1
         self.nnodes = self.nx * self.nz
@@ -60,7 +66,7 @@ class Flac(object):
 
     def read_mesh(self, frame):
         columns = 2
-        f = open('mesh.0')
+        f = self._open('mesh.0')
         offset = (frame-1) * columns * self.nnodes * sizeoffloat
         f.seek(offset)
         x, z = self._read_data(f, columns)
@@ -70,7 +76,7 @@ class Flac(object):
 
     def read_vel(self, frame):
         columns = 2
-        f = open('vel.0')
+        f = self._open('vel.0')
         offset = (frame-1) * columns * self.nnodes * sizeoffloat
         f.seek(offset)
         vx, vz = self._read_data(f, columns)
@@ -80,7 +86,7 @@ class Flac(object):
 
     def read_temperature(self, frame):
         columns = 1
-        f = open('temperature.0')
+        f = self._open('temperature.0')
         offset = (frame-1) * columns * self.nnodes * sizeoffloat
         f.seek(offset)
         T = self._read_data(f, columns)
@@ -90,7 +96,7 @@ class Flac(object):
 
     def read_coolingrate(self, frame):
         columns = 1
-        f = open('coolingrate.0')
+        f = self._open('coolingrate.0')
         offset = (frame-1) * columns * self.nnodes * sizeoffloat
         f.seek(offset)
         cr = self._read_data(f, columns)
@@ -101,12 +107,12 @@ class Flac(object):
 
     def read_original_mesh(self, frame):
         columns = 1
-        f = open('xoriginal.0')
+        f = self._open('xoriginal.0')
         offset = (frame-1) * columns * self.nnodes * sizeoffloat
         f.seek(offset)
         x0 = self._read_data(f, columns)
         self._reshape_nodal_fields(x0)
-        f = open('zoriginal.0')
+        f = self._open('zoriginal.0')
         offset = (frame-1) * columns * self.nnodes * sizeoffloat
         f.seek(offset)
         z0 = self._read_data(f, columns)
@@ -116,7 +122,7 @@ class Flac(object):
 
     def read_aps(self, frame):
         columns = 1
-        f = open('aps.0')
+        f = self._open('aps.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         aps = self._read_data(f, columns, count=self.nelements)
@@ -126,7 +132,7 @@ class Flac(object):
 
     def read_density(self, frame):
         columns = 1
-        f = open('density.0')
+        f = self._open('density.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         density = self._read_data(f, columns, count=self.nelements)
@@ -136,7 +142,7 @@ class Flac(object):
 
     def read_area(self, frame):
         columns = 1
-        f = open('area.0')
+        f = self._open('area.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         area = self._read_data(f, columns, count=self.nelements)
@@ -146,7 +152,7 @@ class Flac(object):
 
     def read_area(self, frame):
         columns = 1
-        f = open('area.0')
+        f = self._open('area.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         area = self._read_data(f, columns, count=self.nelements)
@@ -156,19 +162,19 @@ class Flac(object):
 
     def read_strain(self, frame):
         columns = 1
-        f = open('exx.0')
+        f = self._open('exx.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         exx = self._read_data(f, columns, count=self.nelements)
         self._reshape_elemental_fields(exx)
 
-        f = open('ezz.0')
+        f = self._open('ezz.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         ezz = self._read_data(f, columns, count=self.nelements)
         self._reshape_elemental_fields(ezz)
 
-        f = open('exz.0')
+        f = self._open('exz.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         exz = self._read_data(f, columns, count=self.nelements)
@@ -178,7 +184,7 @@ class Flac(object):
 
     def read_eII(self, frame):
         columns = 1
-        f = open('eII.0')
+        f = self._open('eII.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         eII = self._read_data(f, columns, count=self.nelements)
@@ -188,7 +194,7 @@ class Flac(object):
 
     def read_sII(self, frame):
         columns = 1
-        f = open('sII.0')
+        f = self._open('sII.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         sII = self._read_data(f, columns, count=self.nelements)
@@ -198,7 +204,7 @@ class Flac(object):
 
     def read_sxx(self, frame):
         columns = 1
-        f = open('sxx.0')
+        f = self._open('sxx.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         sxx = self._read_data(f, columns, count=self.nelements)
@@ -208,7 +214,7 @@ class Flac(object):
 
     def read_sxz(self, frame):
         columns = 1
-        f = open('sxz.0')
+        f = self._open('sxz.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         sxz = self._read_data(f, columns, count=self.nelements)
@@ -218,7 +224,7 @@ class Flac(object):
 
     def read_syy(self, frame):
         columns = 1
-        f = open('syy.0')
+        f = self._open('syy.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         syy = self._read_data(f, columns, count=self.nelements)
@@ -228,7 +234,7 @@ class Flac(object):
 
     def read_szz(self, frame):
         columns = 1
-        f = open('szz.0')
+        f = self._open('szz.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         szz = self._read_data(f, columns, count=self.nelements)
@@ -238,7 +244,7 @@ class Flac(object):
 
     def read_srII(self, frame):
         columns = 1
-        f = open('srII.0')
+        f = self._open('srII.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         srII = self._read_data(f, columns, count=self.nelements)
@@ -247,19 +253,19 @@ class Flac(object):
 
     def read_strain_rate(self, frame):
         columns = 1
-        f = open('srxx.0')
+        f = self._open('srxx.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         srxx = self._read_data(f, columns, count=self.nelements)
         self._reshape_elemental_fields(srxx)
 
-        f = open('srzz.0')
+        f = self._open('srzz.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         srzz = self._read_data(f, columns, count=self.nelements)
         self._reshape_elemental_fields(srzz)
 
-        f = open('srxz.0')
+        f = self._open('srxz.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         srxz = self._read_data(f, columns, count=self.nelements)
@@ -269,7 +275,7 @@ class Flac(object):
 
     def read_pres(self, frame):
         columns = 1
-        f = open('pres.0')
+        f = self._open('pres.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         pres = self._read_data(f, columns, count=self.nelements)
@@ -279,7 +285,7 @@ class Flac(object):
 
     def read_fmelt(self, frame):
         columns = 1
-        f = open('fmelt.0')
+        f = self._open('fmelt.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         fmelt = self._read_data(f, columns, count=self.nelements)
@@ -287,19 +293,39 @@ class Flac(object):
         return fmelt
 
 
+    def read_fmelt2(self, frame):
+        columns = 1
+        f = self._open('fmelt2.0')
+        offset = (frame-1) * columns * self.nelements * sizeoffloat
+        f.seek(offset)
+        fmelt2 = self._read_data(f, columns, count=self.nelements)
+        self._reshape_elemental_fields(fmelt2)
+        return fmelt2
+
+
     def read_fmagma(self, frame):
         columns = 1
-        f = open('fmagma.0')
+        f = self._open('fmagma.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         fmagma = self._read_data(f, columns, count=self.nelements)
         self._reshape_elemental_fields(fmagma)
         return fmagma
 
+    
+    def read_fmagma2(self, frame):
+        columns = 1
+        f = self._open('fmagma2.0')
+        offset = (frame-1) * columns * self.nelements * sizeoffloat
+        f.seek(offset)
+        fmagma2 = self._read_data(f, columns, count=self.nelements)
+        self._reshape_elemental_fields(fmagma2)
+        return fmagma2
+
 
     def read_diss(self, frame):
         columns = 1
-        f = open('diss.0')
+        f = self._open('diss.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         diss = self._read_data(f, columns, count=self.nelements)
@@ -309,7 +335,7 @@ class Flac(object):
 
     def read_visc(self, frame):
         columns = 1
-        f = open('visc.0')
+        f = self._open('visc.0')
         offset = (frame-1) * columns * self.nelements * sizeoffloat
         f.seek(offset)
         visc = self._read_data(f, columns, count=self.nelements)
@@ -319,7 +345,7 @@ class Flac(object):
 
     def read_phase(self, frame):
         columns = 1
-        f = open('phase.0')
+        f = self._open('phase.0')
         offset = (frame-1) * columns * self.nelements * sizeofint
         f.seek(offset)
         phase = self._read_data(f, columns, count=self.nelements, dtype=np.int32)
@@ -327,14 +353,36 @@ class Flac(object):
         return phase
 
 
+    def read_topo(self, frame):
+        columns = 1
+        f = self._open('topo.0')
+        offset = (frame-1) * columns * self.nx * sizeoffloat
+        f.seek(offset)
+        topo = self._read_data(f, columns, count=self.nx)
+        return topo
+
+
+    def read_dtopo(self, frame):
+        columns = 1
+        f = self._open('dtopo.0')
+        offset = (frame-1) * columns * self.nx * sizeoffloat
+        f.seek(offset)
+        dtopo = self._read_data(f, columns, count=self.nx)
+        return dtopo
+
+
     def read_markers(self, frame):
         # read tracer size
-        tmp = np.fromfile('_markers.0', sep=' ')
+        tmp = np.fromfile(os.path.join(self.wdir, '_markers.0'), sep=' ')
         tmp.shape = (-1, 4)
         n = int(tmp[frame-1,2])
 
         suffix = '.%06d.0' % frame
-        f2 = open('marker2' + suffix)
+        f2 = self._open('marker2' + suffix)
+        # marker2.NNNNNN.0 is always written as int32 per field by
+        # src/outmarker.f90, regardless of the in-memory Fortran type
+        # (marker_data.f90 stores mark_dead/mark_phase as 1-byte integers,
+        # but widens them before writing), so dtype=np.int32 here is correct.
         dead = self._read_data(f2, count=n, dtype=np.int32).astype(np.uint8)
         tmp = self._read_data(f2, count=n, dtype=np.int32).astype(np.uint8)
         phase = self._remove_dead_markers(tmp, dead)
@@ -342,7 +390,7 @@ class Flac(object):
         ntriag = self._remove_dead_markers(tmp, dead)
         f2.close()
 
-        f1 = open('marker1' + suffix)
+        f1 = self._open('marker1' + suffix)
         tmp = self._read_data(f1, count=n)
         x = self._remove_dead_markers(tmp, dead)
 
@@ -358,6 +406,9 @@ class Flac(object):
         tmp = self._read_data(f1, count=n)
         a2 = self._remove_dead_markers(tmp, dead)
 
+        # marker IDs are never stored on disk (Fortran's mark_ID was always
+        # equal to a marker's own array index, so it was removed as
+        # redundant); synthesize the same values here from position.
         tmp = np.arange(1, n+1)
         ID = self._remove_dead_markers(tmp, dead)
         f1.close()
@@ -458,27 +509,34 @@ class FlacFromVTK(object):
        Try to maintain the same API as Flac()
     '''
 
-    def __init__(self, swap_endian=False):
+    def _open(self, filename, mode='r'):
+        return open(os.path.join(self.wdir, filename), mode)
+
+    def __init__(self, swap_endian=False, wdir='.'):
         self.last_frame_read = None
         self.cached_vts = None
+        self.wdir = wdir
 
-        allvts = glob.glob('flac.*.vts')
+        allvts = glob.glob(os.path.join(self.wdir, 'flac.*.vts'))
         allvts.sort()
-        if allvts[0] != 'flac.000001.vts':
+        if len(allvts) == 0:
+            print('Error: no vts frames found in directory:', self.wdir)
+            sys.exit(1)
+        if os.path.basename(allvts[0]) != 'flac.000001.vts':
             print('Error: missing first vts frame!')
             sys.exit(1)
         self.nrec = len(allvts)
         self.frames = list(range(1, self.nrec+1))
         self.steps = np.zeros(self.nrec)
         self.time = np.zeros(self.nrec)
-        self._read_vtk(1) # get grid size
+        self._read_vtk(0) # get grid size from first frame
         return
 
 
     def _read_vtk(self, frame):
         filename = 'flac.%06d.vts' % self.frames[frame]
-        print('Reading from', filename)
-        f = open(filename, 'r')
+        print('Reading from', os.path.join(self.wdir, filename))
+        f = self._open(filename, 'r')
         d = f.readlines()
         for n, line in enumerate(d):
             d[n] = line.strip()
@@ -544,11 +602,12 @@ class FlacFromVTK(object):
 
 
     def _locate_line(self, data, name, dtype="Float32"):
-        s = '<DataArray type="%s" Name="%s"' % (dtype, name)
+        s = 'Name="%s"' % name
+        s_type = 'type="%s"' % dtype
         for n, line in enumerate(data):
-            if line[:len(s)] == s: break
+            if s in line and s_type in line: break
         else:
-            print('Error: reading data', s)
+            print('Error: reading data Name="%s" type="%s"' % (name, dtype))
             sys.exit(1)
 
         line = self._unpack_vtk(data[n+1])
@@ -564,16 +623,15 @@ class FlacFromVTK(object):
             print('Error: reading data', s)
             sys.exit(1)
 
-        s = '<DataArray type="Float32"  NumberOfComponents="3" format="binary">'
-        if data[n+1] != s:
-            print('Error: reading data', s)
+        if not data[n+1].startswith('<DataArray type="Float32"') or 'NumberOfComponents="3"' not in data[n+1]:
+            print('Error: reading data Points DataArray:', data[n+1])
             sys.exit(1)
 
         a = self._unpack_vtk(data[n+2])
         a = np.frombuffer(a, dtype=np.float32).reshape(-1,3)
         x, z = a[:,0], a[:,1]
-        x.shape = (self.nx, self.nz)
-        z.shape = (self.nx, self.nz)
+        x.shape = (self.nz, self.nx)
+        z.shape = (self.nz, self.nx)
         return x.transpose(), z.transpose()
 
 
@@ -582,41 +640,25 @@ class FlacFromVTK(object):
         a = self._locate_line(data, "Velocity")
         a = np.frombuffer(a, dtype=np.float32).reshape(-1,3)
         vx, vz = a[:,0], a[:,1]
-        vx.shape = (self.nx, self.nz)
-        vz.shape = (self.nx, self.nz)
+        vx.shape = (self.nz, self.nx)
+        vz.shape = (self.nz, self.nx)
         return vx.transpose(), vz.transpose()
 
 
     def read_temperature(self, frame):
-        data = self._get_vtk_data(frame)
-        a = self._locate_line(data, "Temperature")
-        T = np.frombuffer(a, dtype=np.float32)
-        T.shape = (self.nx-1, self.nz-1)
-        return T.transpose()
+        return self.read_point_data(frame, "Temperature")
 
 
     def read_aps(self, frame):
-        data = self._get_vtk_data(frame)
-        a = self._locate_line(data, "Plastic strain")
-        aps = np.frombuffer(a, dtype=np.float32)
-        aps.shape = (self.nx-1, self.nz-1)
-        return aps.transpose()
+        return self.read_cell_data(frame, "Plastic strain")
 
 
     def read_density(self, frame):
-        data = self._get_vtk_data(frame)
-        a = self._locate_line(data, "Density")
-        density = np.frombuffer(a, dtype=np.float32)
-        density.shape = (self.nx-1, self.nz-1)
-        return density.transpose()
+        return self.read_cell_data(frame, "Density")
 
 
     def read_area(self, frame):
-        data = self._get_vtk_data(frame)
-        a = self._locate_line(data, "Area")
-        area = np.frombuffer(a, dtype=np.float32)
-        area.shape = (self.nx-1, self.nz-1)
-        return area.transpose()
+        return self.read_cell_data(frame, "Area")
 
 
     def read_strain(self, frame):
@@ -624,51 +666,27 @@ class FlacFromVTK(object):
 
 
     def read_eII(self, frame):
-        data = self._get_vtk_data(frame)
-        a = self._locate_line(data, "eII")
-        eII = np.frombuffer(a, dtype=np.float32)
-        eII.shape = (self.nx-1, self.nz-1)
-        return eII.transpose()
+        return self.read_cell_data(frame, "eII")
 
 
     def read_sII(self, frame):
-        data = self._get_vtk_data(frame)
-        a = self._locate_line(data, "sII")
-        sII = np.frombuffer(a, dtype=np.float32)
-        sII.shape = (self.nx-1, self.nz-1)
-        return sII.transpose()
+        return self.read_cell_data(frame, "Stress")
 
 
     def read_sxx(self, frame):
-        data = self._get_vtk_data(frame)
-        a = self._locate_line(data, "Sxx")
-        sxx = np.frombuffer(a, dtype=np.float32)
-        sxx.shape = (self.nx-1, self.nz-1)
-        return sxx.transpose()
+        return self.read_cell_data(frame, "Sxx")
 
 
     def read_sxz(self, frame):
-        data = self._get_vtk_data(frame)
-        a = self._locate_line(data, "Sxz")
-        sxz = np.frombuffer(a, dtype=np.float32)
-        sxz.shape = (self.nx-1, self.nz-1)
-        return sxz.transpose()
+        return self.read_cell_data(frame, "Sxz")
 
 
     def read_szz(self, frame):
-        data = self._get_vtk_data(frame)
-        a = self._locate_line(data, "Szz")
-        szz = np.frombuffer(a, dtype=np.float32)
-        szz.shape = (self.nx-1, self.nz-1)
-        return szz.transpose()
+        return self.read_cell_data(frame, "Szz")
 
 
     def read_srII(self, frame):
-        data = self._get_vtk_data(frame)
-        a = self._locate_line(data, "Strain rate")
-        srII = np.frombuffer(a, dtype=np.float32)
-        srII.shape = (self.nx-1, self.nz-1)
-        return srII.transpose()
+        return self.read_cell_data(frame, "Strain rate")
 
 
     def read_pres(self, frame):
@@ -676,19 +694,27 @@ class FlacFromVTK(object):
 
 
     def read_fmelt(self, frame):
+        return self.read_cell_data(frame, "Melt fraction")
+
+
+    def read_fmelt2(self, frame):
         data = self._get_vtk_data(frame)
         a = self._locate_line(data, "Melt fraction")
-        fmelt = np.frombuffer(a, dtype=np.float32)
-        fmelt.shape = (self.nx-1, self.nz-1)
-        return fmelt.transpose()
+        fmelt2 = np.frombuffer(a, dtype=np.float32)
+        fmelt2.shape = (self.nx-1, self.nz-1)
+        return fmelt2.transpose()
 
 
     def read_fmagma(self, frame):
+        return self.read_cell_data(frame, "Magma fraction")
+
+
+    def read_fmagma2(self, frame):
         data = self._get_vtk_data(frame)
-        a = self._locate_line(data, "Magma fraction")
-        fmagma = np.frombuffer(a, dtype=np.float32)
-        fmagma.shape = (self.nx-1, self.nz-1)
-        return fmagma.transpose()
+        a = self._locate_line(data, "Magma fraction2")
+        fmagma2 = np.frombuffer(a, dtype=np.float32)
+        fmagma2.shape = (self.nx-1, self.nz-1)
+        return fmagma2.transpose()
 
 
     def read_diss(self, frame):
@@ -696,25 +722,44 @@ class FlacFromVTK(object):
 
 
     def read_visc(self, frame):
-        data = self._get_vtk_data(frame)
-        a = self._locate_line(data, "Viscosity")
-        visc = np.frombuffer(a, dtype=np.float32)
-        visc.shape = (self.nx-1, self.nz-1)
-        return visc.transpose()
+        return self.read_cell_data(frame, "Viscosity")
 
 
     def read_phase(self, frame):
+        return self.read_cell_data(frame, "Phase", dtype="Int32")
+
+
+    def read_cell_data(self, frame, name, dtype="Float32"):
         data = self._get_vtk_data(frame)
-        a = self._locate_line(data, "Phase", "Int32")
-        phase = np.frombuffer(a, dtype=np.int32)
-        phase.shape = (self.nx-1, self.nz-1)
-        return phase.transpose()
+        a = self._locate_line(data, name, dtype)
+        dt = np.int32 if dtype == "Int32" else np.float32
+        arr = np.frombuffer(a, dtype=dt)
+        arr.shape = (self.nz-1, self.nx-1)
+        return arr.transpose()
+
+
+    def read_point_data(self, frame, name, dtype="Float32"):
+        data = self._get_vtk_data(frame)
+        a = self._locate_line(data, name, dtype)
+        dt = np.int32 if dtype == "Int32" else np.float32
+        arr = np.frombuffer(a, dtype=dt)
+        arr.shape = (self.nz, self.nx)
+        return arr.transpose()
+
+
+    def read_marker_field(self, frame, name, dtype="Float32"):
+        filename = 'flacmarker.%06d.vtp' % self.frames[frame]
+        f = self._open(filename, 'r')
+        d = [line.strip() for line in f.readlines()]
+        a = self._locate_line(d, name, dtype)
+        dt = np.int32 if dtype == "Int32" else np.float32
+        return np.frombuffer(a, dtype=dt)
 
 
     def read_markers(self, frame):
         filename = 'flacmarker.%06d.vtp' % self.frames[frame]
-        print('Reading from', filename)
-        f = open(filename, 'r')
+        print('Reading from', os.path.join(self.wdir, filename))
+        f = self._open(filename, 'r')
         d = f.readlines()
         for n, line in enumerate(d):
             d[n] = line.strip()
@@ -754,9 +799,8 @@ class FlacFromVTK(object):
             print('Error: reading data', s)
             sys.exit(1)
 
-        s = '<DataArray type="Float32"  NumberOfComponents="3" format="binary">'
-        if data[n+1] != s:
-            print('Error: reading data', s)
+        if not data[n+1].startswith('<DataArray type="Float32"') or 'NumberOfComponents="3"' not in data[n+1]:
+            print('Error: reading data Points DataArray:', data[n+1])
             sys.exit(1)
 
         a = self._unpack_vtk(data[n+2])

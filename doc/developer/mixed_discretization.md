@@ -38,7 +38,7 @@ Diagonal / splitting (Pair 1):       Diagonal \ splitting (Pair 2):
 
 ## 2. Triangle Node Mapping (`kk` and `mm` parameters)
 
-To map the vertices of the 4 sub-triangles (A, B, C, D) back to the 4 corners of the parent quadrilateral, the solver uses two static lookup arrays defined in `src/fl_node.f90` and `src/fl_srate.f90`:
+To map the vertices of the 4 sub-triangles (A, B, C, D) back to the 4 corners of the parent quadrilateral, the solver uses two static lookup arrays defined in `src/fl_node.f90` and `src/fl_rheol.f90`:
 
 ```fortran
 integer, parameter :: kk(3, 4) = reshape((/ 2,3,4, 1,2,3, 1,2,4, 1,3,4 /), (/3, 4/))
@@ -82,7 +82,7 @@ shpdz_loc(3, 1) = (x2 - x1) * area(je, ie, 1)  ! dN3/dz
 
 These derivative components are used in two critical physical calculation steps:
 
-### A. Strain Rate Calculation (`src/fl_srate.f90`)
+### A. Strain Rate Calculation (`src/fl_rheol.f90`)
 The components of the strain-rate tensor for each sub-triangle $k$ are calculated by summing node velocities multiplied by shape function derivatives:
 
 $$\dot{\epsilon}_{xx}^k = \sum_{m=1}^3 V_x^m \cdot \text{shpdx\_loc}(m, k)$$

@@ -110,7 +110,11 @@ endif
 
 if (s1 .ge. ten_max) then
     ipls = -5
-    goto 800
+    s11 = ten_max + press_add
+    s22 = ten_max + press_add
+    s12 = 0.0d0
+    s33 = ten_max + press_add
+    return
 endif
 
 !- uniaxial tension ... intermediate p.s. ---
@@ -160,25 +164,25 @@ endif
 !- general tension failure?
 if (s1 .ge. ten_max) then
     ipls = -5
-    goto 800
+    s11 = ten_max + press_add
+    s22 = ten_max + press_add
+    s12 = 0.0d0
+    s33 = ten_max + press_add
+    return
 endif
 
 !- uniaxial tension ... intermediate p.s. ---
-if (s2 .ge. ten_max .and.ndim.eq.3) then
+if (s2 .ge. ten_max .and. ndim .eq. 3) then
     ipls = -6
     s2 = ten_max
     s3 = ten_max
-    goto 205
-endif
-
-!- uniaxial tension ... minor p.s. ---
-if (s3 .ge. ten_max) then
+else if (s3 .ge. ten_max) then
+    !- uniaxial tension ... minor p.s. ---
     ipls = -7
     s3 = ten_max 
 endif
 
 !- direction cosines
-205 continue
 if ( psdif .eq. 0.d0 ) then
     cs2 = 1.d0
     si2 = 0.d0
@@ -188,52 +192,34 @@ else
 endif
 
 !- resolve back to global axes
-goto (210,220,230), icase
-
-210 continue
-dc2 = (s1-s3) * cs2
-dss = s1 + s3
-s11 = 0.5d0 * (dss + dc2)
-s22 = 0.5d0 * (dss - dc2)
-s12 = 0.5d0 * (s1 - s3) * si2
-s33 = s2
-goto 240
-
-220 continue
-dc2 = (s2-s3) * cs2
-dss = s2 + s3
-s11 = 0.5d0 * (dss + dc2)
-s22 = 0.5d0 * (dss - dc2)
-s12 = 0.5d0 * (s2 - s3) * si2
-s33 = s1
-goto 240
-
-230 continue
-dc2 = (s1-s2) * cs2
-dss = s1 + s2
-s11 = 0.5d0 * (dss + dc2)
-s22 = 0.5d0 * (dss - dc2)
-s12 = 0.5d0 * (s1 - s2) * si2
-s33 = s3
-
-240 continue
+select case (icase)
+case (1)
+    dc2 = (s1-s3) * cs2
+    dss = s1 + s3
+    s11 = 0.5d0 * (dss + dc2)
+    s22 = 0.5d0 * (dss - dc2)
+    s12 = 0.5d0 * (s1 - s3) * si2
+    s33 = s2
+case (2)
+    dc2 = (s2-s3) * cs2
+    dss = s2 + s3
+    s11 = 0.5d0 * (dss + dc2)
+    s22 = 0.5d0 * (dss - dc2)
+    s12 = 0.5d0 * (s2 - s3) * si2
+    s33 = s1
+case (3)
+    dc2 = (s1-s2) * cs2
+    dss = s1 + s2
+    s11 = 0.5d0 * (dss + dc2)
+    s22 = 0.5d0 * (dss - dc2)
+    s12 = 0.5d0 * (s1 - s2) * si2
+    s33 = s3
+end select
 
 s11 = s11 + press_add
 s22 = s22 + press_add
 s33 = s33 + press_add
 
-return
-
-!-- set stresses to plastic apex ---
-800   continue
-s11        = ten_max
-s22        = ten_max
-s12        = 0.0d0
-s33        = ten_max
-
-s11 = s11 + press_add
-s22 = s22 + press_add
-s33 = s33 + press_add
 return
 end
 
@@ -246,8 +232,11 @@ subroutine pre_plast (i,j,coh,phi,psi,hardn)
 !$ACC routine seq
 use arrays
 use params
-include 'precision.inc'
-
+implicit none
+integer, intent(in) :: i, j
+double precision, intent(out) :: coh, phi, psi, hardn
+integer :: iph
+double precision :: pls_curr, f, c, d, h, dpl, fma
 pls_curr = aps(j,i)
 
 phi = 0
@@ -292,10 +281,10 @@ enddo
 
 phi = 1 / phi
 coh = 1 / coh
-
+fma = min(fmagma(j,i)+fmagma2(j,i),fmagma_max)
 if (itype_melting == 1) then
-    phi = phi * (1 - (1 - weaken_ratio_plastic) * fmagma(j,i) / fmagma_max)
-    coh = coh * (1 - (1 - weaken_ratio_plastic) * fmagma(j,i) / fmagma_max)
+    phi = phi * (1 - (1 - weaken_ratio_plastic) * fma / fmagma_max)
+    coh = coh * (1 - (1 - weaken_ratio_plastic) * fma / fmagma_max)
 endif
 
 return

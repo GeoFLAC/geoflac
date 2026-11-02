@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 
 '''Interpolate marker thermochron ages onto grid elements and save them in grid VTS files.
+
+Thermochronology age conventions:
+  - NaN: Unreset system (the marker/cell was never heated above its closure temperature Tc to reset its clock).
+  - -1.0: Unclosed / open system (the marker/cell was reset, but is currently hotter than Tc).
+  - >= 0.0: Closed system thermochronology age in Myr (time elapsed since cooling below Tc).
 '''
 
 from __future__ import print_function

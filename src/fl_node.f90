@@ -3,13 +3,12 @@
 subroutine fl_node
 use arrays
 use params
-include 'precision.inc'
-
+implicit none
 integer, parameter :: kk(3, 4) = reshape((/ 2,3,4, 1,2,3, 1,2,4, 1,3,4 /), (/3, 4/))
 integer, parameter :: mm(3, 4) = reshape((/ 3,3,2, 2,2,2, 3,1,3, 1,1,1 /), (/3, 4/))
 
-integer :: i, j, k, je, ie
-double precision :: x1, y1, x2, y2, x3, y3, x4, y4
+integer :: i, j, k, je, ie, iunknown
+double precision :: x1, y1, x2, y2, x3, y3, x4, y4, drat, fx, fy, factor, p_est, rosubg, press_norm_l, dlx_l, dly_l, press_norm_r, dlx_r, dly_r, rho_water_g, water_depth
 double precision :: shpdx_loc(3, 4), shpdz_loc(3, 4)
 
 !  1 - 3

@@ -4,11 +4,10 @@
 subroutine setflac
 use arrays
 use params
-include 'precision.inc'
-
-
+implicit none
 nloop = 0
 time = 0.d0
+istart_profile = 50
 !$ACC update device(nloop,time)
 
 ! Mesh generator
@@ -35,6 +34,13 @@ call check_visc_rheol
 ! Inverse Areas of triangles
 call init_areas
 
+! Minimum element area of the initial (t=0) grid; used later as the
+! per-timestep cap on dike-intrusion eigenstrain release. Computed once
+! here (never recomputed after remeshing) and persisted across restarts
+! (see saveflac.f90/rsflac.f90), since a restart's current grid is no
+! longer the initial one.
+Amin = minval(0.5d0/area(:,:,1) + 0.5d0/area(:,:,2))
+
 ! Initiate temperature field
 call init_temp
 
@@ -52,7 +58,9 @@ sshrheat = 0
 dtopo = 0
 extrusion = 0
 fmelt = 0
+fmelt2 = 0
 fmagma = 0
+fmagma2 = 0
 e2sr = 1d-16
 se2sr = 1d-16
 q_init = 0.d0
@@ -71,6 +79,11 @@ call dt_mass
 ! Initiate parameters for stress averaging
 dtavg=0
 nsrate=-1
+! dtavg/nsrate are reset after update_acc's bulk push above (which must
+! run before rmasses/init_visc/dt_mass, since those need nx, nz, and the
+! other params scalars/small arrays already on device); push these two
+! explicitly so the device copy doesn't retain a stale pre-reset value.
+!$ACC update device(dtavg, nsrate) async(1)
 
 return
 end
@@ -79,8 +92,7 @@ end
 subroutine update_acc
 use arrays
 use params
-include 'precision.inc'
-
+implicit none
 !$ACC update device(nx,nz,nzonx,nzony,nelz_x(maxzone),nelz_y(maxzone), &
 !$ACC     ny_rem,mode_rem,ntest_rem,ivis_shape, &
 !$ACC     itype_melting,nelem_serp,nelem_dike,nmass_update,nopbmax,nydrsides,nystressbc, &
@@ -109,7 +121,7 @@ include 'precision.inc'
 !$ACC     dx_rem,angle_rem,topo_kappa,fac_kappa, &
 !$ACC     v_min,v_max,efoldc, &
 !$ACC     dxmin,dzmin, &
-!$ACC     prod_magma,rho_magma, &
+!$ACC     prod_magma,rho_magma,prod_magma2, &
 !$ACC     bca(maxbc),bcb(maxbc),bcc(maxbc),xReyn, &
 !$ACC     bcd(maxbc),bce(maxbc),bcf(maxbc),bcg(maxbc),bch(maxbc),bci(maxbc), &
 !$ACC     dt_scale,strain_inert,vbc,frac, &
@@ -122,13 +134,13 @@ include 'precision.inc'
 !$ACC     cohesion1(maxph),cohesion2(maxph), &
 !$ACC     dilat1(maxph),dilat2(maxph), &
 !$ACC     conduct(maxph),cp(maxph), &
-!$ACC     ts(maxph),tl(maxph),tk(maxph),fk(maxph), &
+!$ACC     ts(maxph),tl(maxph),tk(maxph),erodibility(maxph), &
 !$ACC     ten_off,tau_heal,xinitaps(maxinh), &
 !$ACC     extra_pres,t_top,t_bot,hs,hr,bot_bc, &
 !$ACC     hc(maxzone_age,maxzone_layer), &
 !$ACC     age_1(maxzone_age),tp1(maxzone_age),tp2(maxzone_age), &
 !$ACC     g,pisos,drosub,damp_vis, &
-!$ACC     angle_mzone,fmagma_max,ratio_mantle_mzone, &
+!$ACC     angle_mzone,fmagma_max,ratio_mantle_mzone,ratio_crust_mzone,Amin, &
 !$ACC     latent_heat_magma,lambda_freeze,lambda_freeze_tdep, &
 !$ACC     weaken_ratio_plastic,weaken_ratio_viscous, &
 !$ACC     dtavg, &

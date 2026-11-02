@@ -36,7 +36,7 @@ When a simulation is run, the solver writes outputs to binary files at regular t
     *   **Units**: Dimensionless (fraction).
 *   **`pres.0`**
     *   **Meaning**: Hydrostatic confining pressure.
-    *   **Units**: Kilobars ($\text{kbar}$, where $1 \text{ kbar} = 10^8 \text{ Pa} = 100 \text{ MPa}$).
+    *   **Units**: Pascals ($\text{Pa}$).
 *   **`srII.0`**
     *   **Meaning**: Second invariant of the deviatoric strain rate tensor.
     *   **Units**: $\log_{10}(\text{s}^{-1})$ (e.g., a value of $-14.0$ represents a strain rate of $10^{-14} \text{ s}^{-1}$).
@@ -45,10 +45,10 @@ When a simulation is run, the solver writes outputs to binary files at regular t
     *   **Units**: Dimensionless (fraction).
 *   **`sII.0`**
     *   **Meaning**: Second invariant of deviatoric stress (effective stress).
-    *   **Units**: Kilobars ($\text{kbar}$).
-*   **`sxx.0`, `szz.0`, `sxz.0`**
-    *   **Meaning**: Deviatoric stress tensor components ($\sigma'_{xx}$, $\sigma'_{zz}$, and shear stress $\sigma_{xz}$).
-    *   **Units**: Kilobars ($\text{kbar}$).
+    *   **Units**: Pascals ($\text{Pa}$).
+*   **`sxx.0`, `szz.0`, `sxz.0`, `syy.0`**
+    *   **Meaning**: Deviatoric stress tensor components ($\sigma'_{xx}$, $\sigma'_{zz}$, shear stress $\sigma_{xz}$, and out-of-plane stress $\sigma'_{yy}$).
+    *   **Units**: Pascals ($\text{Pa}$).
 *   **`density.0`**
     *   **Meaning**: Effective bulk density of the element (including thermal expansion and pressure compressibility).
     *   **Units**: $\text{kg/m}^3$.
@@ -56,11 +56,11 @@ When a simulation is run, the solver writes outputs to binary files at regular t
     *   **Meaning**: Heat source term (includes radiogenic decay and shear heating).
     *   **Units**: $\text{W/kg}$ (or $\text{W/m}^3$).
 *   **`diss.0`**
-    *   **Meaning**: Energy dissipation rate due to plastic and viscous work.
-    *   **Units**: $\text{W/kg}$ (or $\text{W/m}^3$).
+    *   **Meaning**: Shear heating dissipation rate, normalized by the reference radiogenic heat production rate `hs`: `shrheat/den/hs`.
+    *   **Units**: Dimensionless (ratio to `hs`).
 *   **`coolingrate.0`**
     *   **Meaning**: Cooling rate ($dT/dt$) tracked for markers.
-    *   **Units**: $^\circ\text{C}/\text{Myr}$ (or $^\circ\text{C}/\text{s}$).
+    *   **Units**: $^\circ\text{C}/\text{Myr}$.
 
 ### D. Boundary & 1D Surface Outputs
 *   **`forc.0`**
@@ -83,19 +83,19 @@ When VisIt loads `.vts` (grid) or `.vtp` (marker) files converted via the utilit
 
 | VisIt Dataset Name | Source Binary File | Dimension / Type | Units | Physical Meaning |
 |:-------------------|:-------------------|:-----------------|:------|:-----------------|
-| **`Velocity`** | `vel.0` | 3D Vector | $\text{m/s}$ | Velocity vector field ($V_x$, $V_z$, with $V_y=0.0$). Converted from $\text{cm/yr}$ during VTK export. |
+| **`Velocity`** | `vel.0` | 3D Vector | $\text{cm/yr}$ | Velocity vector field ($V_x$, $V_z$, with $V_y=0.0$). |
 | **`Temperature`** | `temp.0` | Scalar | $^\circ\text{C}$ | Temperature. |
-| **`Cooling rate`** | `coolingrate.0` | Scalar | $^\circ\text{C}/\text{s}$ | Rock cooling rate ($dT/dt$). |
+| **`Cooling rate`** | `coolingrate.0` | Scalar | $^\circ\text{C}/\text{Myr}$ | Rock cooling rate ($dT/dt$). |
 | **`Phase`** | `phase.0` | Scalar (Int) | Dimensionless | Rock type phase ID. |
 | **`Plastic strain`** | `aps.0` | Scalar | Dimensionless | Accumulated plastic strain. |
 | **`Strain rate`** | `srII.0` | Scalar | $\log_{10}(\text{s}^{-1})$ | Second invariant of deviatoric strain rate. |
 | **`eII`** | `eII.0` | Scalar | Dimensionless | Second invariant of deviatoric strain. |
-| **`Stress`** | `sII.0` | Scalar | $\text{kbar}$ | Second invariant of deviatoric stress. |
-| **`Pressure`** | `pres.0` | Scalar | $\text{kbar}$ | Hydrostatic confining pressure. |
-| **`Sxx`, `Szz`, `Sxz`**| `sxx.0`, `szz.0`, `sxz.0`| Scalar | $\text{kbar}$ | Deviatoric stress tensor components. |
+| **`Stress`** | `sII.0` | Scalar | $\text{Pa}$ | Second invariant of deviatoric stress. |
+| **`Pressure`** | `pres.0` | Scalar | $\text{Pa}$ | Hydrostatic confining pressure. |
+| **`Sxx`, `Szz`, `Sxz`, `Syy`**| `sxx.0`, `szz.0`, `sxz.0`, `syy.0`| Scalar | $\text{Pa}$ | Deviatoric stress tensor components. |
 | **`Density`** | `density.0` | Scalar | $\text{kg/m}^3$ | Bulk density. |
 | **`Viscosity`** | `visc.0` | Scalar | $\log_{10}(\text{Pa}\cdot\text{s})$ | Effective shear viscosity. |
-| **`Dissipation`** | `diss.0` | Scalar | $\text{W/kg}$ | Mechanical energy dissipation rate. |
+| **`Dissipation`** | `diss.0` | Scalar | Dimensionless | Shear heating dissipation rate, normalized by the reference radiogenic heat production rate `hs`: `shrheat/den/hs`. |
 | **`Melt fraction`** | `melt.0` | Scalar | Dimensionless | Partial melt volume fraction. |
 | **`Magma fraction`**| `magma.0` | Scalar | Dimensionless | Migrating magma volume fraction. |
 | **`Area`** | Calculated | Scalar | $\text{m}^2$ | Area of the grid element. |
@@ -129,4 +129,4 @@ During a simulation run, the solver periodically saves its complete state to bin
 *   **`phase.rs`**: Element phase IDs [direct access, $(nz-1) \cdot (nx-1)$ double precision words].
 *   **`strain.rs` / `stress.rs`**: Element strain and stress tensors [direct access].
 *   **`aps.rs` / `fmagma.rs` / `source.rs`**: Element accumulated plastic strain, magma fraction, and heat sources [direct access].
-*   **`marker1.rs` / `marker2.rs`**: Nodal marker coordinates, ages (marker1) and integer properties, phases, IDs (marker2) [direct access].
+*   **`marker1.rs` / `marker2.rs`**: Marker coordinates, ages, barycentric coordinates (marker1) and active-status flags, triangle indices, phases (marker2) [direct access].

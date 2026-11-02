@@ -13,6 +13,8 @@ D_2023_02_04 = datetime(2023, 2, 4)
 D_2025_10_17 = datetime(2025, 10, 17)
 D_2026_05_27 = datetime(2026, 5, 27)
 D_2026_06_12 = datetime(2026, 6, 12)
+D_2026_07_30 = datetime(2026, 7, 30)
+D_2026_08_02 = datetime(2026, 8, 2)
 
 def parse_date(date_str):
     for fmt in ('%Y-%m-%d', '%Y/%m/%d', '%Y%m%d'):
@@ -321,12 +323,14 @@ def parse_inp(clean_lines, date):
         nelem_serp = int(line1[1])
         prod_magma = float(line1[2])
         nelem_dike = 1
+        prod_magma2 = 0.0
         rho_magma = 2700.0
 
         line2 = get_tokens('magma_line2')
         angle_mzone = float(line2[0])
         fmagma_max = float(line2[1])
         ratio_mantle_mzone = float(line2[3])
+        ratio_crust_mzone = 0.1
 
         line3 = get_tokens('magma_line3')
         latent_heat_magma = 4.2e5
@@ -343,12 +347,14 @@ def parse_inp(clean_lines, date):
         nelem_serp = int(line1[1])
         prod_magma = float(line1[2])
         nelem_dike = 1
+        prod_magma2 = 0.0
         rho_magma = 2700.0
 
         line2 = get_tokens('magma_line2')
         angle_mzone = float(line2[0])
         fmagma_max = float(line2[1])
         ratio_mantle_mzone = float(line2[3])
+        ratio_crust_mzone = 0.1
 
         line3 = get_tokens('magma_line3')
         latent_heat_magma = 4.2e5
@@ -366,11 +372,13 @@ def parse_inp(clean_lines, date):
         prod_magma = float(line1[2])
         rho_magma = float(line1[3])
         nelem_dike = 1
+        prod_magma2 = 0.0
 
         line2 = get_tokens('magma_line2')
         angle_mzone = float(line2[0])
         fmagma_max = float(line2[1])
         ratio_mantle_mzone = float(line2[3])
+        ratio_crust_mzone = 0.1
 
         line3 = get_tokens('magma_line3')
         latent_heat_magma = float(line3[0])
@@ -388,11 +396,61 @@ def parse_inp(clean_lines, date):
         prod_magma = float(line1[2])
         rho_magma = float(line1[3])
         nelem_dike = 1
+        prod_magma2 = 0.0
 
         line2 = get_tokens('magma_line2')
         angle_mzone = float(line2[0])
         fmagma_max = float(line2[1])
         ratio_mantle_mzone = float(line2[2])
+        ratio_crust_mzone = 0.1
+
+        line3 = get_tokens('magma_line3')
+        latent_heat_magma = float(line3[0])
+        lambda_freeze = float(line3[1])
+        lambda_freeze_tdep = float(line3[2])
+
+        line4 = get_tokens('magma_line4')
+        weaken_ratio_plastic = float(line4[0])
+        weaken_ratio_viscous = float(line4[1])
+
+    elif date < D_2026_07_30:
+        line1 = get_tokens('magma_line1')
+        itype_melting = int(line1[0])
+        nelem_serp = int(line1[1])
+        nelem_dike = int(line1[2])
+        prod_magma = float(line1[3])
+        rho_magma = float(line1[4])
+        prod_magma2 = 0.0
+
+        line2 = get_tokens('magma_line2')
+        angle_mzone = float(line2[0])
+        fmagma_max = float(line2[1])
+        ratio_mantle_mzone = float(line2[2])
+        ratio_crust_mzone = 0.1
+
+        line3 = get_tokens('magma_line3')
+        latent_heat_magma = float(line3[0])
+        lambda_freeze = float(line3[1])
+        lambda_freeze_tdep = float(line3[2])
+
+        line4 = get_tokens('magma_line4')
+        weaken_ratio_plastic = float(line4[0])
+        weaken_ratio_viscous = float(line4[1])
+
+    elif date < D_2026_08_02:
+        line1 = get_tokens('magma_line1')
+        itype_melting = int(line1[0])
+        nelem_serp = int(line1[1])
+        nelem_dike = int(line1[2])
+        prod_magma = float(line1[3])
+        prod_magma2 = float(line1[4])
+        rho_magma = float(line1[5])
+
+        line2 = get_tokens('magma_line2')
+        angle_mzone = float(line2[0])
+        fmagma_max = float(line2[1])
+        ratio_mantle_mzone = float(line2[2])
+        ratio_crust_mzone = 0.1
 
         line3 = get_tokens('magma_line3')
         latent_heat_magma = float(line3[0])
@@ -409,12 +467,14 @@ def parse_inp(clean_lines, date):
         nelem_serp = int(line1[1])
         nelem_dike = int(line1[2])
         prod_magma = float(line1[3])
-        rho_magma = float(line1[4])
+        prod_magma2 = float(line1[4])
+        rho_magma = float(line1[5])
 
         line2 = get_tokens('magma_line2')
         angle_mzone = float(line2[0])
         fmagma_max = float(line2[1])
         ratio_mantle_mzone = float(line2[2])
+        ratio_crust_mzone = float(line2[3])
 
         line3 = get_tokens('magma_line3')
         latent_heat_magma = float(line3[0])
@@ -523,8 +583,8 @@ def parse_inp(clean_lines, date):
         'inhom': inhom, 'inhoms': inhoms, 'ten_off': ten_off, 'tau_heal': tau_heal,
         'v_min': v_min, 'v_max': v_max, 'ivis_shape': ivis_shape, 'efoldc': efoldc,
         'itype_melting': itype_melting, 'nelem_serp': nelem_serp, 'nelem_dike': nelem_dike,
-        'prod_magma': prod_magma, 'rho_magma': rho_magma, 'angle_mzone': angle_mzone,
-        'fmagma_max': fmagma_max, 'ratio_mantle_mzone': ratio_mantle_mzone,
+        'prod_magma': prod_magma, 'prod_magma2': prod_magma2, 'rho_magma': rho_magma, 'angle_mzone': angle_mzone,
+        'fmagma_max': fmagma_max, 'ratio_mantle_mzone': ratio_mantle_mzone, 'ratio_crust_mzone': ratio_crust_mzone,
         'latent_heat_magma': latent_heat_magma, 'lambda_freeze': lambda_freeze,
         'lambda_freeze_tdep': lambda_freeze_tdep, 'weaken_ratio_plastic': weaken_ratio_plastic,
         'weaken_ratio_viscous': weaken_ratio_viscous, 'ny_rem': ny_rem, 'mode_rem': mode_rem,
@@ -649,7 +709,7 @@ def write_new_inp(data, comments_map, final_comments, filename):
                                      (False, ";=============================================================")],
                    default_trailing="       -iprestress: allow topo build up by isostasy")
         write_line('extra_pres', f"{data['extra_pres']}",
-                   default_trailing="    -extra pressure (GPa)")
+                   default_trailing="    -extra pressure (Pa)")
         write_line('itherm', f"{data['itherm']}",
                    default_trailing="        -itherm (1-mech+therm, 2-no mech)")
         write_line('istress_therm', f"{data['istress_therm']}",
@@ -706,7 +766,7 @@ def write_new_inp(data, comments_map, final_comments, filename):
                     comment_key = 'phase_9'
             
             write_line(comment_key, line_str,
-                       default_preceding=[(False, ";irheol,_,den, alfa,  beta,    n,       A,       E,    V,    Lame:rl, Lame:rm,pls1,pls2,fric1,fric2, coh1, coh2,dilat1,dilat2,cond,    cp,     Ts,     Tl,     Tk, fk")] if idx == 0 else None)
+                       default_preceding=[(False, ";irheol,_,den, alfa,  beta,    n,       A,       E,    V,    Lame:rl, Lame:rm,pls1,pls2,fric1,fric2, coh1, coh2,dilat1,dilat2,cond,    cp,     Ts,     Tl,     Tk, erodibility")] if idx == 0 else None)
 
         # 5. Phase distribution & Inhomogeneities
         write_line('irphase', f"{data['irphase']}",
@@ -730,10 +790,10 @@ def write_new_inp(data, comments_map, final_comments, filename):
         write_line('v_lims', f"{data['v_min']}, {data['v_max']}, {data['ivis_shape']}, {data['efoldc']}",
                    default_preceding=[(True, ""), (False, "; VISCOSITY LIMIT")])
                    
-        write_line('magma_line1', f"{data['itype_melting']}, {data['nelem_serp']}, {data['nelem_dike']}, {data['prod_magma']}, {data['rho_magma']}",
-                   default_preceding=[(True, ""), (False, "; Magma:"), (False, "; itype_melting, nelem_serp, nelem_dike, prod_magma, rho_magma")])
-        write_line('magma_line2', f"{data['angle_mzone']}, {data['fmagma_max']}, {data['ratio_mantle_mzone']}",
-                   default_preceding=[(False, "; angle_mzone, fmagma_max, ratio_mantle_mzone")])
+        write_line('magma_line1', f"{data['itype_melting']}, {data['nelem_serp']}, {data['nelem_dike']}, {data['prod_magma']}, {data['prod_magma2']}, {data['rho_magma']}",
+                   default_preceding=[(True, ""), (False, "; Magma:"), (False, "; itype_melting, nelem_serp, nelem_dike, prod_magma, prod_magma2, rho_magma")])
+        write_line('magma_line2', f"{data['angle_mzone']}, {data['fmagma_max']}, {data['ratio_mantle_mzone']}, {data['ratio_crust_mzone']}",
+                   default_preceding=[(False, "; angle_mzone, fmagma_max, ratio_mantle_mzone, ratio_crust_mzone")])
         write_line('magma_line3', f"{data['latent_heat_magma']}, {data['lambda_freeze']}, {data['lambda_freeze_tdep']}",
                    default_preceding=[(False, "; latent_heat_magma, lambda_freeze, lambda_freeze_tdep")])
         write_line('magma_line4', f"{data['weaken_ratio_plastic']}, {data['weaken_ratio_viscous']}",

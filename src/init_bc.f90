@@ -5,7 +5,9 @@ subroutine init_bc
 
   use arrays
   use params
-  include 'precision.inc'
+  implicit none
+  integer :: i, n, ndbc, numbp, numbp1, nnop, nebou, mid_j
+  double precision :: x, x1, x2, xn, xa
   !
   !      ---- bc(nh*2)-for each nodal degree-of-freedom this is assigned zero
   !      value,unless a boundary condition is applied,in which case it is
@@ -225,8 +227,9 @@ subroutine stressbc (i,n,numbp,numbp1,x)
   use params
   implicit none
 
-  integer :: i, n, numbp, numbp1
-  double precision :: x, fun
+  integer, intent(in) :: i, n, numbp, numbp1
+  double precision, intent(in) :: x
+  double precision :: fun
   double precision, parameter :: pi2 = 2.d0 * 3.14159d0
 
   fun =  bca(i) + bcb(i)*x + bcc(i)*x*x  & 
@@ -283,8 +286,8 @@ subroutine velbc (i,numbp,x,mid_j)
   use arrays
   use params
   implicit none
-  integer :: i, numbp, mid_j
-  double precision :: x
+  integer, intent(in) :: i, numbp, mid_j
+  double precision, intent(in) :: x
   double precision, parameter :: pi2 = 2.d0 * 3.14159d0
   double precision :: fun
   integer :: ii1, jj1
@@ -332,14 +335,6 @@ subroutine velbc (i,numbp,x,mid_j)
       endif
   endif
 
-  ! - y component 
-
-  !            if (nbc(i) .eq. 30 ) then
-  !       ncod(numbp,3) = 1
-  !       bc  (numbp,3) = fun
-  !        write(*,*) numbp,ncod(numbp,3),bc(numbp,3)
-  !             endif
-
   return
 end subroutine velbc
 
@@ -347,8 +342,10 @@ subroutine velbc_visc(i)
 
   use arrays
   use params
-  include 'precision.inc'
-
+  implicit none
+  integer, intent(in) :: i
+  integer :: ii, ie, jj
+  double precision :: tmp, tmp1, Eff_visc
   if (nofside(i).eq.1) then
       ii = 1
       ie = 1
@@ -389,8 +386,8 @@ subroutine vbcal
 
   use arrays
   use params
-  include 'precision.inc'
-
+  implicit none
+  integer :: i, j, k, u
   vbc = 0.d0
 
   do i = 1,nx
@@ -403,9 +400,9 @@ subroutine vbcal
   enddo
   if(vbc.eq.0.d0) vbc=1.d-10
 
-  open(13,file = 'vbc.s')
-  write(13,*) vbc
-  close(13)
+  open(newunit=u, file='vbc.s')
+  write(u,*) vbc
+  close(u)
   !$ACC update device(vbc) async(1)
 
   return

@@ -3,9 +3,9 @@
 subroutine read_params(inputfile)
 use arrays
 use params
-include 'precision.inc'
-
-character*200 inputfile
+implicit none
+character*200, intent(in) :: inputfile
+integer :: i, j, iu, line, u11
 
 iu = 4
 open( iu, file=inputfile )
@@ -15,9 +15,9 @@ line = 1
 call AdvanceToNextInputLine(4, line)
 read(4,*,err=1000) nx, nz
 line = line + 1
-open(11,file='nxnz.0')
-write(11,*) nx, nz
-close(11)
+open(newunit=u11, file='nxnz.0')
+write(u11,*) nx, nz
+close(u11)
 
 nx = nx+1
 nz = nz+1
@@ -41,40 +41,38 @@ if (ircoord .gt. 0) then
     read(4,*,err=1000) nzony
     line = line + 1
     if (nzony .ne. 0) stop 'ircoord is set, but nzony is not 0!'
-    go to 177
-endif
-call AdvanceToNextInputLine(4, line)
-read(4,*,err=1000) nzonx
-line = line + 1
-if (nzonx .eq.0) then
-    nzonx = 1
-    nelz_x(1) = nx - 1
-    sizez_x(1) = 1.d0
-    go to 166
-endif
-do i = 1, nzonx
+else
     call AdvanceToNextInputLine(4, line)
-    read(4,*,err=1000) nelz_x(i), sizez_x(i)
+    read(4,*,err=1000) nzonx
     line = line + 1
-end do
-166 continue
+    if (nzonx .eq. 0) then
+        nzonx = 1
+        nelz_x(1) = nx - 1
+        sizez_x(1) = 1.d0
+    else
+        do i = 1, nzonx
+            call AdvanceToNextInputLine(4, line)
+            read(4,*,err=1000) nelz_x(i), sizez_x(i)
+            line = line + 1
+        end do
+    endif
 
-call AdvanceToNextInputLine(4, line)
-read(4,*,err=1000) nzony
-line = line + 1
-if (nzony .eq.0) then
-    nzony = 1
-    nelz_y(1)    = nz - 1
-    sizez_y(1)   = 1.d0
-    go to 177
-endif
-do i = 1,nzony
-    sizez_y(i) = 1.d0
     call AdvanceToNextInputLine(4, line)
-    read(4,*,err=1000) nelz_y(i), sizez_y(i)
+    read(4,*,err=1000) nzony
     line = line + 1
-end do
-177 continue
+    if (nzony .eq. 0) then
+        nzony = 1
+        nelz_y(1)    = nz - 1
+        sizez_y(1)   = 1.d0
+    else
+        do i = 1,nzony
+            sizez_y(i) = 1.d0
+            call AdvanceToNextInputLine(4, line)
+            read(4,*,err=1000) nelz_y(i), sizez_y(i)
+            line = line + 1
+        end do
+    endif
+endif
 
 ! MECHANICAL CONDITIONS
 call AdvanceToNextInputLine(4, line)
@@ -197,7 +195,7 @@ do i = 1, nphase
     read(4,*,err=1000) irheol(i),visc(i),den(i),alfa(i),beta(i),pln(i),acoef(i),eactiv(i),vactiv(i), &
          rl(i),rm(i),plstrain1(i),plstrain2(i),fric1(i),fric2(i),cohesion1(i),cohesion2(i), &
          dilat1(i),dilat2(i), &
-         conduct(i),cp(i),ts(i),tl(i),tk(i),fk(i)
+         conduct(i),cp(i),ts(i),tl(i),tk(i),erodibility(i)
     line = line + 1
 end do
 print *, nphase, 'phases'
@@ -243,10 +241,10 @@ call AdvanceToNextInputLine(4, line)
 read(4,*,err=1000) v_min, v_max, ivis_shape,efoldc
 line = line + 1
 call AdvanceToNextInputLine(4, line)
-read(4,*,err=1000) itype_melting, nelem_serp, nelem_dike, prod_magma, rho_magma
+read(4,*,err=1000) itype_melting, nelem_serp, nelem_dike, prod_magma, prod_magma2, rho_magma
 line = line + 1
 call AdvanceToNextInputLine(4, line)
-read(4,*,err=1000) angle_mzone, fmagma_max, ratio_mantle_mzone
+read(4,*,err=1000) angle_mzone, fmagma_max, ratio_mantle_mzone, ratio_crust_mzone
 line = line + 1
 call AdvanceToNextInputLine(4, line)
 read(4,*,err=1000) latent_heat_magma, lambda_freeze, lambda_freeze_tdep
@@ -351,22 +349,25 @@ end
 
 
 subroutine AdvanceToNextInputLine(iu, line)
-character*1 buf
-integer iu, line
+implicit none
+integer, intent(in) :: iu
+integer, intent(inout) :: line
+character(len=1) :: buf
+integer :: ios
 
-10    line = line + 1
-      read(iu, '(A1)') buf
-      if( buf(1:1).eq.';' ) then
-          goto 10
-      else
-          ! this line is not a comment, rewind
-          backspace( iu )
-          line = line - 1
-          return
-      endif
+do
+    line = line + 1
+    read(iu, '(A1)', iostat=ios) buf
+    if (ios /= 0) then
+        print *, 'AdvanceToNextInputLine: EOF or error reached!'
+        stop 11
+    endif
+    if (buf(1:1) /= ';') then
+        ! this line is not a comment, rewind
+        backspace(iu)
+        line = line - 1
+        return
+    endif
+end do
 
-print *, 'AdvanceToNextInputLine: EOF reached!'
-stop
-
-return
-end
+end subroutine AdvanceToNextInputLine

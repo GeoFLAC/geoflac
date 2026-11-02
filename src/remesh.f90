@@ -105,6 +105,13 @@ call rem_interpolate( nzt, nxt, dummye, aps )
 ! Magma fraction
 if (itype_melting == 1) then
     call rem_interpolate( nzt, nxt, dummye, fmagma )
+    call rem_interpolate( nzt, nxt, dummye, fmagma2 )
+    ! Dike-intrusion eigenstrain/marker tracking (persistent parts only;
+    ! dike_added/dike_released are same-timestep scratch, recomputed fresh
+    ! every fl_therm.f90 call and never needed across a remesh event)
+    call rem_interpolate( nzt, nxt, dummye, dike_backlog )
+    call rem_interpolate( nzt, nxt, dummye, dike_marker_vol )
+    call rem_interpolate( nzt, nxt, dummye, mor_marker_vol )
 endif
 
 
@@ -260,7 +267,7 @@ end
 subroutine rem_trpars(nzt,nxt)
 use arrays
 implicit none
-integer :: nzt,nxt
+integer, intent(in) :: nzt,nxt
 integer :: i, j, k, n
 double precision :: x1, x2, x3, y1, y2, y3, det
 
@@ -319,8 +326,10 @@ end
 !===============================================
 subroutine rem_barcord(nzt,nxt)
 use arrays
-include 'precision.inc'
-integer :: nzt,nxt
+implicit none
+integer, intent(in) :: nzt,nxt
+integer :: i, j, k, l, lt, io, jo, m, n, mm, nmin, numqu
+double precision :: perr, xx, yy, a1, a2, a3, amod, amodmin, dist1, dist2, dist3
 
 
 perr = 1.d-4
@@ -337,7 +346,7 @@ do i = 1, nxt
         amodmin = 1.d+10
 
         numtr(j,i) = 0
-        do io = max(1, i-mm), min(nxt-1, i+mm)
+        search_loop: do io = max(1, i-mm), min(nxt-1, i+mm)
             do jo = max(1, j-mm), min(nzt-1, j+mm)
                 do k = 1, 2
                     n = 2*( (nzt-1)*(io-1)+jo-1 ) + k
@@ -356,13 +365,11 @@ do i = 1, nxt
                     barcord(j,i,1) = a1
                     barcord(j,i,2) = a2
                     barcord(j,i,3) = a3
-                    goto 10
+                    exit search_loop
                 end do
 
             end do
-        end do
-
-10      continue
+        end do search_loop
     
     ! if a point is outside of the mesh
     if( numtr(j,i) .eq. 0 ) then
@@ -438,8 +445,9 @@ end
 subroutine rem_interpolate( nzt, nxt, dummy, arr )
 use arrays
 implicit none
-integer :: nzt,nxt
-double precision :: dummy(nzt,nxt), arr(nzt,nxt)
+integer, intent(in) :: nzt,nxt
+double precision, intent(out) :: dummy(nzt,nxt)
+double precision, intent(inout) :: arr(nzt,nxt)
 integer :: i, j, io, jo, numq
 double precision :: f1, f2, f3
 
@@ -476,7 +484,7 @@ do i = 1, nxt
         arr(j,i) = barcord(j,i,1)*f1 + barcord(j,i,2)*f2 + barcord(j,i,3)*f3
     end do
 end do
-!$end parallel do
+!$OMP end parallel do
 
 return
 
